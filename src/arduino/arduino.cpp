@@ -1,6 +1,9 @@
-#include "nano.h"
+#include "arduino.h"
 
-void setup() {
+ArduinoBoatController::ArduinoBoatController()
+    : radio(CE_PIN, CSN_PIN), gpsSerial(A0, A1),
+      receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
+      gpsData{0.0f, 0.0f, 0.0f} {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
@@ -27,7 +30,7 @@ void setup() {
   receiveTimer.start(20);
 }
 
-void loop() {
+void ArduinoBoatController::loop() {
   bool isSend = sendTimer.ready();
   bool isReceive = receiveTimer.ready();
   while ((isSend || isReceive) && gpsSerial.available() > 0) {
@@ -59,7 +62,7 @@ void loop() {
   }
 }
 
-void updateGPSData() {
+void ArduinoBoatController::updateGPSData() {
   if (gps.location.isValid()) {
     gpsData.latitude = gps.location.lat();
     gpsData.longitude = gps.location.lng();
@@ -69,7 +72,7 @@ void updateGPSData() {
   }
 }
 
-void navigateToWaypoint(float lat, float lon) {
+void ArduinoBoatController::navigateToWaypoint(float lat, float lon) {
   float distanceToWaypoint = TinyGPSPlus::distanceBetween(
       gpsData.latitude, gpsData.longitude, lat, lon);
 
@@ -109,7 +112,7 @@ void navigateToWaypoint(float lat, float lon) {
 #endif
 }
 
-void manualControl() {
+void ArduinoBoatController::manualControl() {
   int throttle = receivedData.y;
   int steering = receivedData.x;
   int leftMotor = throttle + steering;
@@ -118,7 +121,7 @@ void manualControl() {
   setMotors(leftMotor, rightMotor);
 }
 
-void setMotors(int leftMotor, int rightMotor) {
+void ArduinoBoatController::setMotors(int leftMotor, int rightMotor) {
   leftMotor = constrain(leftMotor, -255, 255);
   rightMotor = constrain(rightMotor, -255, 255);
 
@@ -133,7 +136,8 @@ void setMotors(int leftMotor, int rightMotor) {
 #endif
 }
 
-void rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm, int motor) {
+void ArduinoBoatController::rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm,
+                                        int motor) {
   if (motor > 0) {
     digitalWrite(in, HIGH);
     digitalWrite(in2, LOW);
@@ -147,7 +151,7 @@ void rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm, int motor) {
   }
 }
 
-void stopMotors() {
+void ArduinoBoatController::stopMotors() {
   analogWrite(ENA, 0);
   analogWrite(ENB, 0);
 }

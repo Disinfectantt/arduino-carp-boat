@@ -1,7 +1,7 @@
 #ifndef DATA_H_
 #define DATA_H_
 
-#include <Arduino.h>
+const byte address[6] = "00001";
 
 struct GPSData {
   float latitude;
