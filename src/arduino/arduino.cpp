@@ -26,8 +26,8 @@ ArduinoBoatController::ArduinoBoatController()
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
-  sendTimer.start(50);
-  receiveTimer.start(20);
+  sendTimer.start(SEND_TIMER);
+  receiveTimer.start(RECEIVE_TIMER);
 }
 
 void ArduinoBoatController::loop() {

@@ -20,7 +20,8 @@
 #define SSID ""
 #define PASSWORD ""
 
-const char DB_PATH[] = "/littlefs/points.db";
+#define TIMER_BUTTONS 10
+#define TIMER_RECEIVE 20
 
 // radio
 #define CE_PIN 16
@@ -35,6 +36,8 @@ const char DB_PATH[] = "/littlefs/points.db";
   sqlite3 *db = openConnectToDb();                                             \
   if (db == nullptr)                                                           \
   return
+
+const char DB_PATH[] = "/littlefs/points.db";
 
 class Esp32Controller {
 private:

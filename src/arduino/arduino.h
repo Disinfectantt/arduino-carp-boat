@@ -9,6 +9,9 @@
 #include <data.h>
 #include <nRF24L01.h>
 
+#define SEND_TIMER 20
+#define RECEIVE_TIMER 10
+
 #define CE_PIN 9
 #define CSN_PIN 10
 

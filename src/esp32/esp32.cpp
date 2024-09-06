@@ -70,8 +70,8 @@ Esp32Controller::Esp32Controller()
   pinMode(JOY_L_Y_PIN, INPUT);
   pinMode(JOY_R_X_PIN, INPUT);
 
-  buttonsTimer.start(20);
-  receiveTimer.start(50);
+  buttonsTimer.start(TIMER_BUTTONS);
+  receiveTimer.start(TIMER_RECEIVE);
 }
 
 void Esp32Controller::loop() {
