@@ -1,10 +1,12 @@
 #include "esp32.h"
 
 Esp32Controller::Esp32Controller()
-    : radio(CE_PIN, CSN_PIN), server(80), ws("/ws"),
+    : radio(CE_PIN, CSN_PIN),
+      server(80),
+      ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
-      gpsData{0.0f, 0.0f, 0.0f} {
-
+      gpsData{0.0f, 0.0f, 0.0f},
+      isAccess(false) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
@@ -15,6 +17,14 @@ Esp32Controller::Esp32Controller()
 #endif
     return;
   }
+
+  if (!MDNS.begin(HOSTNAME)) {
+#ifdef DEBUG_MODE
+    Serial.println("MDNS FAILED");
+#endif
+  }
+
+  initWifi();
 
   sqlite3 *db;
   if (sqlite3_open(DB_PATH, &db) != SQLITE_OK) {
@@ -31,30 +41,7 @@ Esp32Controller::Esp32Controller()
   }
   sqlite3_close(db);
 
-  WiFi.begin(SSID, PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-#ifdef DEBUG_MODE
-    Serial.println("Connecting to WiFi...");
-#endif
-  }
-#ifdef DEBUG_MODE
-  Serial.println("Connecting to WiFi");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
-#endif
-
-  ws.onEvent(std::bind(&Esp32Controller::onWebSocketEvent, this,
-                       std::placeholders::_1, std::placeholders::_2,
-                       std::placeholders::_3, std::placeholders::_4,
-                       std::placeholders::_5, std::placeholders::_6));
-  server.addHandler(&ws);
-
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(LittleFS, "/index.html", "text/html");
-  });
-
-  server.begin();
+  initServer();
 
   while (!radio.begin()) {
 #ifdef DEBUG_MODE
@@ -72,6 +59,7 @@ Esp32Controller::Esp32Controller()
 
   buttonsTimer.start(TIMER_BUTTONS);
   receiveTimer.start(TIMER_RECEIVE);
+  wifiReconnectTimer.start(WIFI_RECONNECT_TIMER);
 }
 
 void Esp32Controller::loop() {
@@ -81,6 +69,10 @@ void Esp32Controller::loop() {
 
   if (receiveTimer.ready() && radio.available()) {
     receiveAndSendGpsData();
+  }
+
+  if (wifiReconnectTimer.ready() && WiFi.status() != WL_CONNECTED) {
+    WiFi.reconnect();
   }
 }
 
@@ -106,6 +98,117 @@ void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
       RadioData.autopilotLon = doc["lon"];
     }
   }
+}
+
+void Esp32Controller::initServer() {
+  ws.onEvent(std::bind(&Esp32Controller::onWebSocketEvent, this,
+                       std::placeholders::_1, std::placeholders::_2,
+                       std::placeholders::_3, std::placeholders::_4,
+                       std::placeholders::_5, std::placeholders::_6));
+  server.addHandler(&ws);
+
+  server.on(
+      "/", HTTP_GET,
+      std::bind(&Esp32Controller::handleRoot, this, std::placeholders::_1));
+  if (isAccess) {
+    server.on("/wifi_connect", HTTP_POST,
+              std::bind(&Esp32Controller::handleNewWifi, this,
+                        std::placeholders::_1));
+  }
+
+  server.begin();
+}
+
+void Esp32Controller::handleNewWifi(AsyncWebServerRequest *request) {
+  if (isAccess) {
+    String ssid = request->getParam("ssid", true)->value();
+    String pass = request->getParam("password", true)->value();
+    saveWiFiCredentials(ssid, pass);
+    if (connectWifi(ssid, pass)) {
+      request->redirect("/");
+    } else {
+      startAccess();
+    }
+  }
+}
+
+void Esp32Controller::handleRoot(AsyncWebServerRequest *request) {
+  if (isAccess) {
+    request->send(LittleFS, "/wifi.html", "text/html");
+  } else {
+    request->send(LittleFS, "/index.html", "text/html");
+  }
+}
+
+void Esp32Controller::startAccess() {
+  isAccess = true;
+  WiFi.softAP(SSID, PASSWORD);
+}
+
+void Esp32Controller::initWifi() {
+  String ssid, password;
+  readWiFiCredentials(ssid, password);
+  if (ssid.length() == 0) {
+    startAccess();
+  } else {
+    if (!connectWifi(ssid, password)) {
+      startAccess();
+    }
+  }
+}
+
+bool Esp32Controller::connectWifi(String &ssid, String &password) {
+  int attempts = 0;
+  if (isAccess) {
+    WiFi.softAPdisconnect(false);
+  }
+  if (password.length() == 0) {
+    WiFi.begin(ssid);
+  } else {
+    WiFi.begin(ssid, password);
+  }
+  while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+    delay(1000);
+    ++attempts;
+#ifdef DEBUG_MODE
+    Serial.println("Connecting to WiFi...");
+#endif
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    isAccess = false;
+    return true;
+  }
+  return false;
+}
+
+void Esp32Controller::readWiFiCredentials(String &ssid, String &password) {
+  File file = LittleFS.open("/wifi.txt", "r");
+  if (!file) {
+#ifdef DEBUG_MODE
+    Serial.println("Failed to open wifi file for reading");
+#endif
+    return;
+  }
+  ssid = file.readStringUntil('\n');
+  password = file.readStringUntil('\n');
+
+  ssid.trim();
+  password.trim();
+
+  file.close();
+}
+
+void Esp32Controller::saveWiFiCredentials(String &ssid, String &password) {
+  File file = LittleFS.open("/wifi.txt", "w");
+  if (!file) {
+#ifdef DEBUG_MODE
+    Serial.println("Failed to open wifi file for writing");
+#endif
+    return;
+  }
+  file.println(ssid);
+  file.println(password);
+  file.close();
 }
 
 void Esp32Controller::receiveAndSendGpsData() {

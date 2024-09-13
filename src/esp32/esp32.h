@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <RF24.h>
 #include <SPI.h>
@@ -17,11 +18,13 @@
 
 #define MAX_POINTS 10000
 
-#define SSID ""
-#define PASSWORD ""
+#define SSID "ESP_32"
+#define PASSWORD "admin"
+#define HOSTNAME "transmitter"
 
 #define TIMER_BUTTONS 10
 #define TIMER_RECEIVE 20
+#define WIFI_RECONNECT_TIMER 1000
 
 // radio
 #define CE_PIN 16
@@ -32,23 +35,23 @@
 
 #define JOYSTICK_CENTER 1900
 
-#define OPEN_CONNECT_TO_DB                                                     \
-  sqlite3 *db = openConnectToDb();                                             \
-  if (db == nullptr)                                                           \
-  return
+#define OPEN_CONNECT_TO_DB         \
+  sqlite3 *db = openConnectToDb(); \
+  if (db == nullptr) return
 
 const char DB_PATH[] = "/littlefs/points.db";
 
 class Esp32Controller {
-private:
+ private:
   RF24 radio;
   GPSData gpsData;
   Data RadioData;
   AsyncWebServer server;
   AsyncWebSocket ws;
-  Timer buttonsTimer, receiveTimer;
+  Timer buttonsTimer, receiveTimer, wifiReconnectTimer;
+  bool isAccess;
 
-private:
+ private:
   void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         AwsEventType type, void *arg, uint8_t *data,
                         size_t len);
@@ -60,8 +63,16 @@ private:
   void deletePoint(int id);
   sqlite3 *openConnectToDb();
   void setHome(JsonDocument *doc);
+  void readWiFiCredentials(String &ssid, String &password);
+  void saveWiFiCredentials(String &ssid, String &password);
+  void startAccess();
+  void handleRoot(AsyncWebServerRequest *request);
+  void handleNewWifi(AsyncWebServerRequest *request);
+  void initServer();
+  void initWifi();
+  bool connectWifi(String &ssid, String &password);
 
-public:
+ public:
   Esp32Controller();
   void loop();
 };

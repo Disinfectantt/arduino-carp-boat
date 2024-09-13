@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Wifi</title>
+        <style>
+            body {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100vw;
+                height: 100vh;
+            }
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                transform: scale(1.7);
+            }
+        </style>
+    </head>
+    <body>
+        <form action="/wifi_connect" method="post">
+            <input
+                type="text"
+                name="ssid"
+                placeholder="ssid"
+                maxlength="100"
+                required
+            />
+            <input
+                type="password"
+                name="password"
+                placeholder="password"
+                maxlength="100"
+            />
+            <button type="submit">Submit</button>
+        </form>
+    </body>
+</html>
