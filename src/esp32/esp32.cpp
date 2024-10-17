@@ -6,15 +6,28 @@ Esp32Controller::Esp32Controller()
       ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      isAccess(false) {
+      isAccess(false),
+      buttonsTimer(TIMER_BUTTONS),
+      receiveTimer(TIMER_RECEIVE),
+      wifiReconnectTimer(WIFI_RECONNECT_TIMER) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
 
-  if (!LittleFS.begin(true)) {
+  if (initRadio()) {
+    pinMode(JOY_L_Y_PIN, INPUT);
+    pinMode(JOY_R_X_PIN, INPUT);
+    buttonsTimer.start();
+  }
+
+  if (!LittleFS.begin()) {
 #ifdef DEBUG_MODE
     Serial.println("An Error has occurred while mounting LittleFS");
 #endif
+    return;
+  }
+
+  if (!initDb()) {
     return;
   }
 
@@ -24,42 +37,11 @@ Esp32Controller::Esp32Controller()
 #endif
   }
 
+  initServer();
   initWifi();
 
-  sqlite3 *db;
-  if (sqlite3_open(DB_PATH, &db) != SQLITE_OK) {
-#ifdef DEBUG_MODE
-    Serial.println("Failed to open database");
-#endif
-    return;
-  }
-  const char *sqlCreateTable =
-      "CREATE TABLE IF NOT EXISTS points (id INTEGER PRIMARY KEY "
-      "AUTOINCREMENT, name VARCHAR(100), lat REAL, lon REAL);";
-  if (sqlite3_exec(db, sqlCreateTable, 0, 0, nullptr) != SQLITE_OK) {
-    return;
-  }
-  sqlite3_close(db);
-
-  initServer();
-
-  while (!radio.begin()) {
-#ifdef DEBUG_MODE
-    Serial.println("Radio doesn t work");
-#endif
-    delay(1000);
-  }
-  radio.openWritingPipe(address);
-  radio.setPALevel(RF24_PA_MAX);
-  radio.setDataRate(RF24_250KBPS);
-  radio.stopListening();
-
-  pinMode(JOY_L_Y_PIN, INPUT);
-  pinMode(JOY_R_X_PIN, INPUT);
-
-  buttonsTimer.start(TIMER_BUTTONS);
-  receiveTimer.start(TIMER_RECEIVE);
-  wifiReconnectTimer.start(WIFI_RECONNECT_TIMER);
+  receiveTimer.start();
+  wifiReconnectTimer.start();
 }
 
 void Esp32Controller::loop() {
@@ -67,7 +49,7 @@ void Esp32Controller::loop() {
     getButtonsDataAndSend();
   }
 
-  if (receiveTimer.ready() && radio.available()) {
+  if (receiveTimer.ready()) {
     receiveAndSendGpsData();
   }
 
@@ -98,6 +80,41 @@ void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
       RadioData.autopilotLon = doc["lon"];
     }
   }
+}
+
+bool Esp32Controller::initRadio() {
+  if (!radio.begin()) {
+#ifdef DEBUG_MODE
+    Serial.println("Radio doesn t work");
+#endif
+    return false;
+  }
+  radio.openWritingPipe(address);
+  radio.setPALevel(RF24_PA_MAX);
+  radio.setDataRate(RF24_250KBPS);
+  radio.stopListening();
+  return true;
+}
+
+bool Esp32Controller::initDb() {
+  sqlite3 *db;
+  if (sqlite3_open(DB_PATH, &db) != SQLITE_OK) {
+#ifdef DEBUG_MODE
+    Serial.println("Failed to open database");
+#endif
+    return false;
+  }
+  const char *sqlCreateTable =
+      "CREATE TABLE IF NOT EXISTS points (id INTEGER PRIMARY KEY "
+      "AUTOINCREMENT, name VARCHAR(100), lat REAL, lon REAL);";
+  if (sqlite3_exec(db, sqlCreateTable, 0, 0, nullptr) != SQLITE_OK) {
+#ifdef DEBUG_MODE
+    Serial.println("Failed to create table");
+#endif
+    return false;
+  }
+  sqlite3_close(db);
+  return true;
 }
 
 void Esp32Controller::initServer() {

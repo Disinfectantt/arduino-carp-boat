@@ -2,17 +2,16 @@
 #define TIMER_H_
 
 class Timer {
-public:
+ public:
   Timer() {}
-  Timer(uint32_t nperiod) { start(nperiod); }
+  Timer(uint32_t nperiod) { period = nperiod; }
   void start(uint32_t nperiod) {
     period = nperiod;
     start();
   }
   void start() {
     timer = millis();
-    if (!timer)
-      timer = 1;
+    if (!timer) timer = 1;
   }
   void stop() { timer = 0; }
   bool ready() {
@@ -23,7 +22,7 @@ public:
     return false;
   }
 
-private:
+ private:
   uint32_t timer = 0, period = 0;
 };
 

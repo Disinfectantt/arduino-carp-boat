@@ -18,9 +18,9 @@
 
 #define MAX_POINTS 10000
 
-#define SSID "ESP_32"
-#define PASSWORD "admin"
-#define HOSTNAME "transmitter"
+#define SSID "ESP_32_AP"
+#define PASSWORD "12345678"
+#define HOSTNAME "gaypad"
 
 #define TIMER_BUTTONS 10
 #define TIMER_RECEIVE 20
@@ -71,6 +71,8 @@ class Esp32Controller {
   void initServer();
   void initWifi();
   bool connectWifi(String &ssid, String &password);
+  bool initRadio();
+  bool initDb();
 
  public:
   Esp32Controller();
