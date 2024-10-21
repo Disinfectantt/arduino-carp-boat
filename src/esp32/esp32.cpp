@@ -6,10 +6,7 @@ Esp32Controller::Esp32Controller()
       ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      isAccess(false),
-      buttonsTimer(TIMER_BUTTONS),
-      receiveTimer(TIMER_RECEIVE),
-      wifiReconnectTimer(WIFI_RECONNECT_TIMER) {
+      isAccess(false) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
@@ -17,7 +14,7 @@ Esp32Controller::Esp32Controller()
   if (initRadio()) {
     pinMode(JOY_L_Y_PIN, INPUT);
     pinMode(JOY_R_X_PIN, INPUT);
-    buttonsTimer.start();
+    xTaskCreate(buttonsTask, "Buttons", 128, this, 1, NULL);
   }
 
   if (!LittleFS.begin()) {
@@ -31,31 +28,17 @@ Esp32Controller::Esp32Controller()
     return;
   }
 
+  initWifi();
+  initServer();
+
   if (!MDNS.begin(HOSTNAME)) {
 #ifdef DEBUG_MODE
     Serial.println("MDNS FAILED");
 #endif
   }
 
-  initServer();
-  initWifi();
-
-  receiveTimer.start();
-  wifiReconnectTimer.start();
-}
-
-void Esp32Controller::loop() {
-  if (buttonsTimer.ready()) {
-    getButtonsDataAndSend();
-  }
-
-  if (receiveTimer.ready()) {
-    receiveAndSendGpsData();
-  }
-
-  if (wifiReconnectTimer.ready() && WiFi.status() != WL_CONNECTED) {
-    WiFi.reconnect();
-  }
+  xTaskCreate(receiveTask, "Receive", 128, NULL, 1, NULL);
+  xTaskCreate(wifiReconnectTask, "WifiReconnect", 128, NULL, 1, NULL);
 }
 
 void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
@@ -79,6 +62,32 @@ void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
       RadioData.autopilotLat = doc["lat"];
       RadioData.autopilotLon = doc["lon"];
     }
+  }
+}
+
+void Esp32Controller::buttonsTask(void *param) {
+  while (1) {
+    Esp32Controller *c = (Esp32Controller *)param;
+    c->getButtonsDataAndSend();
+    vTaskDelay(TIMER_BUTTONS / portTICK_PERIOD_MS);
+  }
+}
+
+void Esp32Controller::receiveTask(void *param) {
+  while (1) {
+    Esp32Controller *c = (Esp32Controller *)param;
+    c->receiveAndSendGpsData();
+    vTaskDelay(TIMER_RECEIVE / portTICK_PERIOD_MS);
+  }
+}
+
+void Esp32Controller::wifiReconnectTask(void *param) {
+  while (1) {
+    Esp32Controller *c = (Esp32Controller *)param;
+    if (WiFi.status() != WL_CONNECTED) {
+      WiFi.reconnect();
+    }
+    vTaskDelay(WIFI_RECONNECT_TIMER / portTICK_PERIOD_MS);
   }
 }
 
@@ -185,7 +194,7 @@ bool Esp32Controller::connectWifi(String &ssid, String &password) {
     WiFi.begin(ssid, password);
   }
   while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-    delay(1000);
+    delay(10000);
     ++attempts;
 #ifdef DEBUG_MODE
     Serial.println("Connecting to WiFi...");
@@ -269,7 +278,7 @@ void Esp32Controller::sendAllPoints(AsyncWebSocketClient *client) {
       pointDoc.clear();
       pointDoc["action"] = "addPoint";
       pointDoc["id"] = sqlite3_column_int(res, 0);
-      pointDoc["name"] = (const char *)sqlite3_column_text(res, 1);
+      pointDoc["name"] = (const unsigned char *)sqlite3_column_text(res, 1);
       pointDoc["lat"] = sqlite3_column_double(res, 2);
       pointDoc["lon"] = sqlite3_column_double(res, 3);
       jsonString.clear();

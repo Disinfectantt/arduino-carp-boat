@@ -166,21 +166,29 @@
                 let content = document.createElement("div");
                 content.innerHTML = `
                                 <h3>${name}</h3>
-                                <button onclick="deleteMarker('${id}')">Delete</button>
-                                <button onclick="enableAutopilot('${id}')">Enable Autopilot</button>
+                                <button id="${id}" class="deletePoint">Delete</button>
+                                <button id="${id}" class="enableAutopilot">Enable Autopilot</button>
                             `;
                 return content;
             }
 
+            document.querySelectorAll(".deletePoint").forEach(el => {
+                el.addEventListener("click", (e) => deleteMarker(e.target.id));
+            });
+
             function deleteMarker(id) {
                 if (markers[id]) {
                     map.removeLayer(markers[id]);
-                    delete markers[id];
+                    markers[id] = null;
                     websocket.send(
                         JSON.stringify({ action: "deletePoint", id: id }),
                     );
                 }
             }
+
+            document.querySelectorAll(".enableAutopilot").forEach(el => {
+                el.addEventListener("click", (e) => enableAutopilot(e.target.id));
+            });
 
             function enableAutopilot(id) {
                 if (markers[id]) {
@@ -197,11 +205,7 @@
                 .getElementById("autopilotToggle")
                 .addEventListener("change", (e) => {
                     if (e.target.checked) {
-                        if (currentAutoPilotId) {
-                            let latLng = currentMarker.getLatLng();
-                            sendAutopilotData(latLng.lat, latLng.lng, true);
-                            currentMarker.setIcon(getPin("#4CAF50"));
-                        } else {
+                        if (!currentAutoPilotId) {
                             e.target.checked = false;
                         }
                     } else {

@@ -8,7 +8,6 @@
 #include <LittleFS.h>
 #include <RF24.h>
 #include <SPI.h>
-#include <Timer.h>
 #include <WiFi.h>
 #include <data.h>
 #include <nRF24L01.h>
@@ -48,7 +47,6 @@ class Esp32Controller {
   Data RadioData;
   AsyncWebServer server;
   AsyncWebSocket ws;
-  Timer buttonsTimer, receiveTimer, wifiReconnectTimer;
   bool isAccess;
 
  private:
@@ -74,9 +72,12 @@ class Esp32Controller {
   bool initRadio();
   bool initDb();
 
+  static void buttonsTask(void *param);
+  static void receiveTask(void *param);
+  static void wifiReconnectTask(void *pram);
+
  public:
   Esp32Controller();
-  void loop();
 };
 
 #endif
