@@ -6,7 +6,8 @@ Esp32Controller::Esp32Controller()
       ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      isAccess(false) {
+      isAccess(false),
+      isNetworkStarted(false) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
@@ -14,7 +15,7 @@ Esp32Controller::Esp32Controller()
   if (initRadio()) {
     pinMode(JOY_L_Y_PIN, INPUT);
     pinMode(JOY_R_X_PIN, INPUT);
-    xTaskCreate(buttonsTask, "Buttons", 128, this, 1, NULL);
+    xTaskCreate(buttonsTask, "Buttons", 1024, this, 5, NULL);
   }
 
   if (!LittleFS.begin()) {
@@ -29,16 +30,9 @@ Esp32Controller::Esp32Controller()
   }
 
   initWifi();
-  initServer();
 
-  if (!MDNS.begin(HOSTNAME)) {
-#ifdef DEBUG_MODE
-    Serial.println("MDNS FAILED");
-#endif
-  }
-
-  xTaskCreate(receiveTask, "Receive", 128, NULL, 1, NULL);
-  xTaskCreate(wifiReconnectTask, "WifiReconnect", 128, NULL, 1, NULL);
+  xTaskCreate(receiveTask, "Receive", 4096, this, 5, NULL);
+  xTaskCreate(wifiReconnectTask, "WifiReconnect", 4096, this, 5, NULL);
 }
 
 void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
@@ -46,23 +40,35 @@ void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
                                        AwsEventType type, void *arg,
                                        uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-    sendAllPoints(client);
+    xTaskCreate(sendAllPoints, "All points", 8192, client, 3, NULL);
   } else if (type == WS_EVT_DATA) {
-    JsonDocument doc;
-    deserializeJson(doc, data);
-    std::string action = doc["action"].as<std::string>();
-    if (action == "savePoint") {
-      savePoint(&doc);
-    } else if (action == "deletePoint") {
-      deletePoint(doc["id"]);
-    } else if (action == "setHome") {
-      setHome(&doc);
-    } else if (action == "enableAutopilot") {
-      RadioData.autopilotEnabled = doc["enabled"];
-      RadioData.autopilotLat = doc["lat"];
-      RadioData.autopilotLon = doc["lon"];
+    webSocketWrapper *w = (webSocketWrapper *)malloc(sizeof(webSocketWrapper));
+    w->data = data;
+    w->esp = this;
+    if (w != NULL) {
+      xTaskCreate(processWebsocket, "processWebsocket", 8192, w, 2, NULL);
     }
   }
+}
+
+void Esp32Controller::processWebsocket(void *param) {
+  webSocketWrapper *w = (webSocketWrapper *)param;
+  JsonDocument doc;
+  deserializeJson(doc, w->data);
+  std::string action = doc["action"].as<std::string>();
+  if (action == "savePoint") {
+    w->esp->savePoint(&doc);
+  } else if (action == "deletePoint") {
+    w->esp->deletePoint(doc["id"]);
+  } else if (action == "setHome") {
+    w->esp->setHome(&doc);
+  } else if (action == "enableAutopilot") {
+    w->esp->RadioData.autopilotEnabled = doc["enabled"];
+    w->esp->RadioData.autopilotLat = doc["lat"];
+    w->esp->RadioData.autopilotLon = doc["lon"];
+  }
+  free(w);
+  vTaskDelete(NULL);
 }
 
 void Esp32Controller::buttonsTask(void *param) {
@@ -133,37 +139,23 @@ void Esp32Controller::initServer() {
                        std::placeholders::_5, std::placeholders::_6));
   server.addHandler(&ws);
 
-  server.on(
-      "/", HTTP_GET,
-      std::bind(&Esp32Controller::handleRoot, this, std::placeholders::_1));
-  if (isAccess) {
-    server.on("/wifi_connect", HTTP_POST,
-              std::bind(&Esp32Controller::handleNewWifi, this,
-                        std::placeholders::_1));
-  }
+  server.on("/", HTTP_GET, [&](AsyncWebServerRequest *request) {
+    if (isAccess) {
+      request->send(LittleFS, "/wifi.html", "text/html");
+    } else {
+      request->send(LittleFS, "/index.html", "text/html");
+    }
+  });
+  server.on("/wifi_connect", HTTP_POST, [&](AsyncWebServerRequest *request) {
+    if (isAccess) {
+      String ssid = request->getParam("ssid", true)->value();
+      String pass = request->getParam("password", true)->value();
+      saveWiFiCredentials(ssid, pass);
+      initWifi();
+    }
+  });
 
   server.begin();
-}
-
-void Esp32Controller::handleNewWifi(AsyncWebServerRequest *request) {
-  if (isAccess) {
-    String ssid = request->getParam("ssid", true)->value();
-    String pass = request->getParam("password", true)->value();
-    saveWiFiCredentials(ssid, pass);
-    if (connectWifi(ssid, pass)) {
-      request->redirect("/");
-    } else {
-      startAccess();
-    }
-  }
-}
-
-void Esp32Controller::handleRoot(AsyncWebServerRequest *request) {
-  if (isAccess) {
-    request->send(LittleFS, "/wifi.html", "text/html");
-  } else {
-    request->send(LittleFS, "/index.html", "text/html");
-  }
 }
 
 void Esp32Controller::startAccess() {
@@ -172,18 +164,37 @@ void Esp32Controller::startAccess() {
 }
 
 void Esp32Controller::initWifi() {
+  xTaskCreate(wifiConnectTask, "Init Wifi", 4096, this, 5, NULL);
+}
+
+void Esp32Controller::wifiConnectTask(void *param) {
+  Esp32Controller *e = (Esp32Controller *)param;
+  e->attemptConnectWifi();
+  vTaskDelete(NULL);
+}
+
+void Esp32Controller::attemptConnectWifi() {
   String ssid, password;
   readWiFiCredentials(ssid, password);
-  if (ssid.length() == 0) {
+  if (ssid.length() == 0 && !isAccess) {
     startAccess();
   } else {
-    if (!connectWifi(ssid, password)) {
+    if (!connectWifiAsync(ssid, password)) {
       startAccess();
+    }
+  }
+  if (!isNetworkStarted) {
+    isNetworkStarted = true;
+    initServer();
+    if (!MDNS.begin(HOSTNAME)) {
+#ifdef DEBUG_MODE
+      Serial.println("MDNS FAILED");
+#endif
     }
   }
 }
 
-bool Esp32Controller::connectWifi(String &ssid, String &password) {
+bool Esp32Controller::connectWifiAsync(String &ssid, String &password) {
   int attempts = 0;
   if (isAccess) {
     WiFi.softAPdisconnect(false);
@@ -194,7 +205,7 @@ bool Esp32Controller::connectWifi(String &ssid, String &password) {
     WiFi.begin(ssid, password);
   }
   while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-    delay(10000);
+    vTaskDelay(10000 / portTICK_PERIOD_MS);
     ++attempts;
 #ifdef DEBUG_MODE
     Serial.println("Connecting to WiFi...");
@@ -267,8 +278,12 @@ void Esp32Controller::setDeadZone(int n, int *d) {
   }
 }
 
-void Esp32Controller::sendAllPoints(AsyncWebSocketClient *client) {
-  OPEN_CONNECT_TO_DB;
+void Esp32Controller::sendAllPoints(void *client) {
+  sqlite3 *db = openConnectToDb();
+  if (db == nullptr) {
+    vTaskDelete(NULL);
+    return;
+  }
   sqlite3_stmt *res;
   std::string sql = "SELECT * FROM points;";
   if (sqlite3_prepare_v2(db, sql.c_str(), -1, &res, nullptr) == SQLITE_OK) {
@@ -283,11 +298,13 @@ void Esp32Controller::sendAllPoints(AsyncWebSocketClient *client) {
       pointDoc["lon"] = sqlite3_column_double(res, 3);
       jsonString.clear();
       serializeJson(pointDoc, jsonString);
-      client->text(jsonString);
+      AsyncWebSocketClient *c = (AsyncWebSocketClient *)client;
+      c->text(jsonString);
     }
     sqlite3_finalize(res);
   }
   sqlite3_close(db);
+  vTaskDelete(NULL);
 }
 
 void Esp32Controller::savePoint(JsonDocument *doc) {

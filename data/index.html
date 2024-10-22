@@ -138,7 +138,7 @@
                     if (homeMarker) {
                         map.removeLayer(homeMarker);
                     }
-                    homeMarker = L.marker([lat, lon], {
+                    homeMarker = L.marker([data.lat, data.lon], {
                         icon: getPin("#fa5b05"),
                     }).addTo(map);
                 }
@@ -166,15 +166,11 @@
                 let content = document.createElement("div");
                 content.innerHTML = `
                                 <h3>${name}</h3>
-                                <button id="${id}" class="deletePoint">Delete</button>
-                                <button id="${id}" class="enableAutopilot">Enable Autopilot</button>
+                                <button onclick="deleteMarker(${id})">Delete</button>
+                                <button onclick="enableAutopilot(${id})">Enable Autopilot</button>
                             `;
                 return content;
             }
-
-            document.querySelectorAll(".deletePoint").forEach(el => {
-                el.addEventListener("click", (e) => deleteMarker(e.target.id));
-            });
 
             function deleteMarker(id) {
                 if (markers[id]) {
@@ -185,10 +181,6 @@
                     );
                 }
             }
-
-            document.querySelectorAll(".enableAutopilot").forEach(el => {
-                el.addEventListener("click", (e) => enableAutopilot(e.target.id));
-            });
 
             function enableAutopilot(id) {
                 if (markers[id]) {

@@ -15,7 +15,7 @@
 
 #include <string>
 
-#define MAX_POINTS 10000
+#define MAX_POINTS 5000
 
 #define SSID "ESP_32_AP"
 #define PASSWORD "12345678"
@@ -48,6 +48,7 @@ class Esp32Controller {
   AsyncWebServer server;
   AsyncWebSocket ws;
   bool isAccess;
+  bool isNetworkStarted;
 
  private:
   void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -56,25 +57,38 @@ class Esp32Controller {
   void receiveAndSendGpsData();
   void getButtonsDataAndSend();
   void setDeadZone(int n, int *d);
-  void sendAllPoints(AsyncWebSocketClient *client);
   void savePoint(JsonDocument *doc);
   void deletePoint(int id);
-  sqlite3 *openConnectToDb();
+  static sqlite3 *openConnectToDb();
   void setHome(JsonDocument *doc);
   void readWiFiCredentials(String &ssid, String &password);
   void saveWiFiCredentials(String &ssid, String &password);
   void startAccess();
-  void handleRoot(AsyncWebServerRequest *request);
-  void handleNewWifi(AsyncWebServerRequest *request);
   void initServer();
   void initWifi();
-  bool connectWifi(String &ssid, String &password);
+  bool connectWifiAsync(String &ssid, String &password);
+  void attemptConnectWifi();
   bool initRadio();
   bool initDb();
 
   static void buttonsTask(void *param);
   static void receiveTask(void *param);
-  static void wifiReconnectTask(void *pram);
+  static void wifiReconnectTask(void *param);
+  static void wifiConnectTask(void *param);
+
+  static void sendAllPoints(void *client);
+  static void processWebsocket(void *param);
+
+  struct webSocketWrapper {
+    uint8_t *data;
+    Esp32Controller *esp;
+  };
+
+  struct wifiWrapper {
+    Esp32Controller *esp;
+    String &ssid;
+    String &pass;
+  };
 
  public:
   Esp32Controller();
