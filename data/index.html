@@ -118,6 +118,7 @@
 
             function onOpen(event) {
                 console.log("Connection opened");
+                markers = {};
             }
 
             function onClose(event) {
@@ -174,6 +175,10 @@
 
             function deleteMarker(id) {
                 if (markers[id]) {
+                    if(currentAutoPilotId && currentAutoPilotId === id){
+                        sendAutopilotData(0, 0, false);
+                        currentAutoPilotId = null;
+                    }
                     map.removeLayer(markers[id]);
                     markers[id] = null;
                     websocket.send(
@@ -184,11 +189,13 @@
 
             function enableAutopilot(id) {
                 if (markers[id]) {
+                    if(currentAutoPilotId){
+                        markers[currentAutoPilotId].setIcon(getPin("blue"));
+                    }
                     let latLng = markers[id].getLatLng();
                     sendAutopilotData(latLng.lat, latLng.lng, true);
                     markers[id].setIcon(getPin("#4CAF50"));
                     document.getElementById("autopilotToggle").checked = true;
-                    autopilotEnabled = true;
                     currentAutoPilotId = id;
                 }
             }
@@ -203,7 +210,7 @@
                     } else {
                         sendAutopilotData(0, 0, false);
                         if (currentAutoPilotId) {
-                            currentMarker.setIcon(getPin("#4287f5"));
+                            markers[currentAutoPilotId].setIcon(getPin("blue"));
                             currentAutoPilotId = null;
                         }
                     }
@@ -221,6 +228,7 @@
 
             function submitPoint(event) {
                 event.preventDefault();
+                if(!currentMarker) return;
                 let pointName = document.getElementById("pointName").value;
                 let pointLat = document.getElementById("pointLat").value;
                 let pointLon = document.getElementById("pointLon").value;
@@ -240,9 +248,11 @@
                         lon: parseFloat(pointLon),
                     };
                 }
-                ishome.checked = false;
-                pointName.value = "";
+                document.getElementById("isHome").checked = false;
+                document.getElementById("pointName").value = "";
                 websocket.send(JSON.stringify(data));
+                map.removeLayer(currentMarker);
+                currentMarker = null;
             }
 
             map.addEventListener("click", (e) => {

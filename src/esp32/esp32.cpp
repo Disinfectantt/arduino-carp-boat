@@ -1,13 +1,9 @@
 #include "esp32.h"
 
 Esp32Controller::Esp32Controller()
-    : radio(CE_PIN, CSN_PIN),
-      server(80),
-      ws("/ws"),
+    : radio(CE_PIN, CSN_PIN), server(80), ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
-      gpsData{0.0f, 0.0f, 0.0f},
-      isAccess(false),
-      isNetworkStarted(false) {
+      gpsData{0.0f, 0.0f, 0.0f}, isAccess(false), isNetworkStarted(false) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
@@ -15,7 +11,7 @@ Esp32Controller::Esp32Controller()
   if (initRadio()) {
     pinMode(JOY_L_Y_PIN, INPUT);
     pinMode(JOY_R_X_PIN, INPUT);
-    xTaskCreate(buttonsTask, "Buttons", 1024, this, 5, NULL);
+    xTaskCreate(buttonsTask, "Buttons", 2056, this, 5, NULL);
   }
 
   if (!LittleFS.begin()) {
@@ -31,8 +27,8 @@ Esp32Controller::Esp32Controller()
 
   initWifi();
 
-  xTaskCreate(receiveTask, "Receive", 4096, this, 5, NULL);
-  xTaskCreate(wifiReconnectTask, "WifiReconnect", 4096, this, 5, NULL);
+  xTaskCreate(receiveTask, "Receive", 2056, this, 5, NULL);
+  xTaskCreate(wifiReconnectTask, "WifiReconnect", 2056, this, 5, NULL);
 }
 
 void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
@@ -40,13 +36,13 @@ void Esp32Controller::onWebSocketEvent(AsyncWebSocket *server,
                                        AwsEventType type, void *arg,
                                        uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-    xTaskCreate(sendAllPoints, "All points", 8192, client, 3, NULL);
+    xTaskCreate(sendAllPoints, "All points", 5000, client, 3, NULL);
   } else if (type == WS_EVT_DATA) {
     webSocketWrapper *w = (webSocketWrapper *)malloc(sizeof(webSocketWrapper));
     w->data = data;
     w->esp = this;
     if (w != NULL) {
-      xTaskCreate(processWebsocket, "processWebsocket", 8192, w, 2, NULL);
+      xTaskCreate(processWebsocket, "processWebsocket", 5400, w, 2, NULL);
     }
   }
 }
@@ -68,31 +64,39 @@ void Esp32Controller::processWebsocket(void *param) {
     w->esp->RadioData.autopilotLon = doc["lon"];
   }
   free(w);
+#ifdef DEBUG_MODE
+  Serial.printf("process websocket stack: %u\n",
+                uxTaskGetStackHighWaterMark(NULL));
+#endif
   vTaskDelete(NULL);
 }
 
 void Esp32Controller::buttonsTask(void *param) {
+  Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
-    Esp32Controller *c = (Esp32Controller *)param;
     c->getButtonsDataAndSend();
+    // Serial.printf("buttons stack: %u\n", uxTaskGetStackHighWaterMark(NULL));
     vTaskDelay(TIMER_BUTTONS / portTICK_PERIOD_MS);
   }
 }
 
 void Esp32Controller::receiveTask(void *param) {
+  Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
-    Esp32Controller *c = (Esp32Controller *)param;
     c->receiveAndSendGpsData();
+    // Serial.printf("receive stack: %u\n", uxTaskGetStackHighWaterMark(NULL));
     vTaskDelay(TIMER_RECEIVE / portTICK_PERIOD_MS);
   }
 }
 
 void Esp32Controller::wifiReconnectTask(void *param) {
+  Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
-    Esp32Controller *c = (Esp32Controller *)param;
     if (WiFi.status() != WL_CONNECTED) {
       WiFi.reconnect();
     }
+    // Serial.printf("wifi reconnect stack: %u\n",
+    // uxTaskGetStackHighWaterMark(NULL));
     vTaskDelay(WIFI_RECONNECT_TIMER / portTICK_PERIOD_MS);
   }
 }
@@ -268,7 +272,7 @@ void Esp32Controller::getButtonsDataAndSend() {
   setDeadZone(6, &rawValueX);
   RadioData.y = map(rawValueY, 0, 4095, -255, 255);
   RadioData.x = map(rawValueX, 0, 4095, -255, 255);
-
+  Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
   radio.write(&RadioData, sizeof(Data));
 }
 
@@ -304,6 +308,10 @@ void Esp32Controller::sendAllPoints(void *client) {
     sqlite3_finalize(res);
   }
   sqlite3_close(db);
+#ifdef DEBUG_MODE
+  Serial.printf("Send all points task stack: %u\n",
+                uxTaskGetStackHighWaterMark(NULL));
+#endif
   vTaskDelete(NULL);
 }
 
