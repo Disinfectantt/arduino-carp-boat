@@ -1,9 +1,13 @@
 #include "esp32.h"
 
 Esp32Controller::Esp32Controller()
-    : radio(CE_PIN, CSN_PIN), server(80), ws("/ws"),
+    : radio(CE_PIN, CSN_PIN),
+      server(80),
+      ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
-      gpsData{0.0f, 0.0f, 0.0f}, isAccess(false), isNetworkStarted(false) {
+      gpsData{0.0f, 0.0f, 0.0f},
+      isAccess(false),
+      isNetworkStarted(false) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif

@@ -3,16 +3,13 @@
 PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
-      gpsData{0.0f, 0.0f, 0.0f} {
+      gpsData{0.0f, 0.0f, 0.0f},
+      gpsSerial(GPS_RX, GPS_TX) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
-  while (!Serial)
-    ;
-  Serial.println("Pico spi started");
+  while (!Serial);
 #endif
-  // Serial2.setRX(GPS_RX);
-  // Serial2.setTX(GPS_TX);
-  // Serial2.begin(9600);
+  gpsSerial.begin(9600);
 
   while (!radio.begin()) {
 #ifdef DEBUG_MODE
@@ -71,26 +68,26 @@ void PicoBoatController::sendTask(void *param) {
 void PicoBoatController::gpsTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
-    while (Serial2.available() > 0) {
-      if (p->gps.encode(Serial2.read())) {
-        p->updateGPSData();
-      }
-    }
+    p->updateGPSData();
     vTaskDelay(GPS_TIMER / portTICK_PERIOD_MS);
   }
 }
 
 void PicoBoatController::updateGPSData() {
-  if (gps.location.isValid()) {
-    gpsData.latitude = gps.location.lat();
-    gpsData.longitude = gps.location.lng();
-    if (gps.course.isValid()) {
-      gpsData.course = gps.course.deg();
+  while (gpsSerial.available() > 0) {
+    if (gps.encode(gpsSerial.read())) {
+      if (gps.location.isValid()) {
+        gpsData.latitude = gps.location.lat();
+        gpsData.longitude = gps.location.lng();
+        if (gps.course.isValid()) {
+          gpsData.course = gps.course.deg();
+        }
+        // #ifdef DEBUG_MODE
+        //   Serial.printf("lat: %f\nlon: %f\ncourse: %f", gpsData.latitude,
+        //   gpsData.longitude, gpsData.course);
+        // #endif
+      }
     }
-    // #ifdef DEBUG_MODE
-    //   Serial.printf("lat: %f\nlon: %f\ncourse: %f", gpsData.latitude,
-    //   gpsData.longitude, gpsData.course);
-    // #endif
   }
 }
 
@@ -102,10 +99,8 @@ void PicoBoatController::navigateToWaypoint(float lat, float lon) {
       TinyGPSPlus::courseTo(gpsData.latitude, gpsData.longitude, lat, lon);
 
   float courseError = courseToWaypoint - gpsData.course;
-  if (courseError > 180)
-    courseError -= 360;
-  if (courseError < -180)
-    courseError += 360;
+  if (courseError > 180) courseError -= 360;
+  if (courseError < -180) courseError += 360;
 
   int throttle = 0;
   int steering = 0;

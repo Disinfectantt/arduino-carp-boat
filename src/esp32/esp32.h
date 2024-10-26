@@ -34,15 +34,14 @@
 
 #define JOYSTICK_CENTER 1900
 
-#define OPEN_CONNECT_TO_DB                                                     \
-  sqlite3 *db = openConnectToDb();                                             \
-  if (db == nullptr)                                                           \
-  return
+#define OPEN_CONNECT_TO_DB         \
+  sqlite3 *db = openConnectToDb(); \
+  if (db == nullptr) return
 
 const char DB_PATH[] = "/littlefs/points.db";
 
 class Esp32Controller {
-private:
+ private:
   RF24 radio;
   GPSData gpsData;
   Data RadioData;
@@ -51,7 +50,7 @@ private:
   bool isAccess;
   bool isNetworkStarted;
 
-private:
+ private:
   void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         AwsEventType type, void *arg, uint8_t *data,
                         size_t len);
@@ -91,7 +90,7 @@ private:
     String &pass;
   };
 
-public:
+ public:
   Esp32Controller();
 };
 

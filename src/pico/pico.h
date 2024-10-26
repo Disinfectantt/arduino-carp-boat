@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <FreeRTOS.h>
 #include <RF24.h>
+#include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include <data.h>
 #include <nRF24L01.h>
@@ -18,24 +19,25 @@
 #define CE_PIN 20
 #define CSN_PIN 17
 
-#define GPS_TX 9
-#define GPS_RX 8
+#define GPS_TX 3
+#define GPS_RX 2
 
-#define ENA 4 // left engine speed
-#define ENB 5 // right engine speed
-#define IN1 6 // left engine direction
-#define IN2 7 // left engine direction
-#define IN3 8 // right engine direction
-#define IN4 9 // right engine direction
+#define ENA 4  // left engine speed
+#define ENB 5  // right engine speed
+#define IN1 6  // left engine direction
+#define IN2 7  // left engine direction
+#define IN3 8  // right engine direction
+#define IN4 9  // right engine direction
 
 class PicoBoatController {
-private:
+ private:
   RF24 radio;
   TinyGPSPlus gps;
   Data receivedData;
   GPSData gpsData;
+  SoftwareSerial gpsSerial;
 
-private:
+ private:
   void rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm, int motor);
   void setMotors(int leftMotor, int rightMotor);
   void navigateToWaypoint(float lat, float lon);
@@ -47,7 +49,7 @@ private:
   static void sendTask(void *param);
   static void gpsTask(void *param);
 
-public:
+ public:
   PicoBoatController();
 };
 
