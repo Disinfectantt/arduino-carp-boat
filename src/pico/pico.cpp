@@ -4,7 +4,7 @@ PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      gpsSerial(GPS_RX, GPS_TX) {
+      gpsSerial(GPS_TX, GPS_RX) {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
   while (!Serial);
@@ -88,6 +88,7 @@ void PicoBoatController::updateGPSData() {
         // #endif
       }
     }
+    // Serial.print((char)gpsSerial.read());
   }
 }
 
