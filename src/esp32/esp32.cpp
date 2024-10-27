@@ -276,7 +276,7 @@ void Esp32Controller::getButtonsDataAndSend() {
   setDeadZone(6, &rawValueX);
   RadioData.y = map(rawValueY, 0, 4095, -255, 255);
   RadioData.x = map(rawValueX, 0, 4095, -255, 255);
-  Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
+  // Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
   radio.write(&RadioData, sizeof(Data));
 }
 

@@ -13,9 +13,8 @@
 #define SEND_TIMER 20
 #define RECEIVE_TIMER 10
 #define GPS_TIMER 100
-#define sdfds MISO
-// radio
 
+// radio
 #define CE_PIN 20
 #define CSN_PIN 17
 
