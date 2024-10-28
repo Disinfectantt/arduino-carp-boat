@@ -1,8 +1,8 @@
 #include "./esp32/esp32.h"
 
-Esp32Controller *esp32 = nullptr;
+Esp32Controller esp32;
 
-void setup() { esp32 = new Esp32Controller(); }
+void setup() { esp32.begin(); }
 
 void loop() {
 #ifdef DEBUG_MODE

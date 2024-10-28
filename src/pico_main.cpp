@@ -1,8 +1,8 @@
 #include "./pico/pico.h"
 
-PicoBoatController *boat;
+PicoBoatController boat;
 
-void setup() { boat = new PicoBoatController(); }
+void setup() { boat.begin(); }
 
 void loop() { vTaskDelete(NULL); }
 

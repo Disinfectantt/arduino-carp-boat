@@ -4,7 +4,10 @@ PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      gpsSerial(GPS_TX, GPS_RX) {
+      gpsSerial(GPS_TX, GPS_RX),
+      xMutex(NULL) {}
+
+void PicoBoatController::begin() {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
   while (!Serial);
@@ -18,50 +21,43 @@ PicoBoatController::PicoBoatController()
     delay(1000);
   }
   radio.openReadingPipe(0, address);
+  radio.openWritingPipe(address);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
+  radio.setAutoAck(false);
   radio.startListening();
 
-  pinMode(ENA, OUTPUT);
-  pinMode(ENB, OUTPUT);
-  pinMode(IN1, OUTPUT);
-  pinMode(IN2, OUTPUT);
-  pinMode(IN3, OUTPUT);
-  pinMode(IN4, OUTPUT);
+  initMotors();
+
+  xMutex = xSemaphoreCreateMutex();
   xTaskCreate(receiveTask, "receive", 2048, this, 3, NULL);
-  xTaskCreate(sendTask, "send", 2048, this, 3, NULL);
+  xTaskCreate(sendTask, "send", 2048, this, 2, NULL);
   xTaskCreate(gpsTask, "gps", 2048, this, 3, NULL);
 }
 
 void PicoBoatController::receiveTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
-    if (p->radio.available()) {
-      p->radio.read(&p->receivedData, sizeof(Data));
-      if (p->receivedData.autopilotEnabled && p->gps.location.isValid()) {
-        p->navigateToWaypoint(p->receivedData.autopilotLat,
-                              p->receivedData.autopilotLon);
-      } else {
-        p->manualControl();
-      }
+    if (xSemaphoreTake(p->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      p->receiveData();
+      xSemaphoreGive(p->xMutex);
     } else {
-      if (p->receivedData.isHome) {
-        p->navigateToWaypoint(p->receivedData.homeLat, p->receivedData.homeLon);
-      } else {
-        p->stopMotors();
-      }
+      p->actionOnStopReceive();
     }
-    vTaskDelay(RECEIVE_TIMER / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(RECEIVE_TIMER));
   }
 }
 
 void PicoBoatController::sendTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
-    p->radio.stopListening();
-    p->radio.write(&p->gpsData, sizeof(GPSData));
-    p->radio.startListening();
-    vTaskDelay(SEND_TIMER / portTICK_PERIOD_MS);
+    if (xSemaphoreTake(p->xMutex, portMAX_DELAY) == pdTRUE) {
+      p->radio.stopListening();
+      p->radio.write(&p->gpsData, sizeof(GPSData));
+      p->radio.startListening();
+      xSemaphoreGive(p->xMutex);
+    }
+    vTaskDelay(pdMS_TO_TICKS(SEND_TIMER));
   }
 }
 
@@ -69,7 +65,20 @@ void PicoBoatController::gpsTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
     p->updateGPSData();
-    vTaskDelay(GPS_TIMER / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(GPS_TIMER));
+  }
+}
+
+void PicoBoatController::receiveData() {
+  if (radio.available()) {
+    radio.read(&receivedData, sizeof(Data));
+    if (receivedData.autopilotEnabled && gps.location.isValid()) {
+      navigateToWaypoint(receivedData.autopilotLat, receivedData.autopilotLon);
+    } else {
+      manualControl();
+    }
+  } else {
+    actionOnStopReceive();
   }
 }
 
@@ -88,7 +97,7 @@ void PicoBoatController::updateGPSData() {
         // #endif
       }
     }
-    // Serial.print((char)gpsSerial.read());
+    // Serial.print(char(gpsSerial.read()));
   }
 }
 
@@ -170,6 +179,30 @@ void PicoBoatController::rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm,
 }
 
 void PicoBoatController::stopMotors() {
-  analogWrite(ENA, 0);
-  analogWrite(ENB, 0);
+  receivedData.x = 0;
+  receivedData.y = 0;
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, receivedData.x);
+  analogWrite(ENB, receivedData.y);
+}
+
+void PicoBoatController::initMotors() {
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  stopMotors();
+}
+
+void PicoBoatController::actionOnStopReceive() {
+  if (receivedData.isHome) {
+    navigateToWaypoint(receivedData.homeLat, receivedData.homeLon);
+  } else {
+    stopMotors();
+  }
 }

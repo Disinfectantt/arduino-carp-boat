@@ -7,14 +7,20 @@ Esp32Controller::Esp32Controller()
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
       isAccess(false),
-      isNetworkStarted(false) {
+      isNetworkStarted(false),
+      xMutex(NULL) {}
+
+void Esp32Controller::begin() {
 #ifdef DEBUG_MODE
   Serial.begin(115200);
 #endif
 
+  pinMode(JOY_L_Y_PIN, INPUT);
+  pinMode(JOY_R_X_PIN, INPUT);
+
+  xMutex = xSemaphoreCreateMutex();
+
   if (initRadio()) {
-    pinMode(JOY_L_Y_PIN, INPUT);
-    pinMode(JOY_R_X_PIN, INPUT);
     xTaskCreate(buttonsTask, "Buttons", 2056, this, 5, NULL);
   }
 
@@ -31,7 +37,7 @@ Esp32Controller::Esp32Controller()
 
   initWifi();
 
-  xTaskCreate(receiveTask, "Receive", 2056, this, 5, NULL);
+  xTaskCreate(receiveTask, "Receive", 2056, this, 4, NULL);
   xTaskCreate(wifiReconnectTask, "WifiReconnect", 2056, this, 5, NULL);
 }
 
@@ -78,18 +84,24 @@ void Esp32Controller::processWebsocket(void *param) {
 void Esp32Controller::buttonsTask(void *param) {
   Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
-    c->getButtonsDataAndSend();
+    if (xSemaphoreTake(c->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      c->getButtonsDataAndSend();
+      xSemaphoreGive(c->xMutex);
+    }
     // Serial.printf("buttons stack: %u\n", uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(TIMER_BUTTONS / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(TIMER_BUTTONS));
   }
 }
 
 void Esp32Controller::receiveTask(void *param) {
   Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
-    c->receiveAndSendGpsData();
+    if (xSemaphoreTake(c->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+      c->receiveAndSendGpsData();
+      xSemaphoreGive(c->xMutex);
+    }
     // Serial.printf("receive stack: %u\n", uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(TIMER_RECEIVE / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(TIMER_RECEIVE));
   }
 }
 
@@ -101,7 +113,7 @@ void Esp32Controller::wifiReconnectTask(void *param) {
     }
     // Serial.printf("wifi reconnect stack: %u\n",
     // uxTaskGetStackHighWaterMark(NULL));
-    vTaskDelay(WIFI_RECONNECT_TIMER / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(WIFI_RECONNECT_TIMER));
   }
 }
 
@@ -113,8 +125,10 @@ bool Esp32Controller::initRadio() {
     return false;
   }
   radio.openWritingPipe(address);
+  radio.openReadingPipe(0, address);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
+  radio.setAutoAck(false);
   radio.stopListening();
   return true;
 }
@@ -213,7 +227,7 @@ bool Esp32Controller::connectWifiAsync(String &ssid, String &password) {
     WiFi.begin(ssid, password);
   }
   while (WiFi.status() != WL_CONNECTED && attempts < 10) {
-    vTaskDelay(10000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(10000));
     ++attempts;
 #ifdef DEBUG_MODE
     Serial.println("Connecting to WiFi...");
@@ -270,19 +284,23 @@ void Esp32Controller::receiveAndSendGpsData() {
 }
 
 void Esp32Controller::getButtonsDataAndSend() {
-  int rawValueY = analogRead(JOY_L_Y_PIN);
-  setDeadZone(6, &rawValueY);
-  int rawValueX = analogRead(JOY_R_X_PIN);
-  setDeadZone(6, &rawValueX);
-  RadioData.y = map(rawValueY, 0, 4095, -255, 255);
-  RadioData.x = map(rawValueX, 0, 4095, -255, 255);
+  setDeadZone(analogRead(JOY_L_Y_PIN), analogRead(JOY_R_X_PIN));
   // Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
   radio.write(&RadioData, sizeof(Data));
 }
 
-void Esp32Controller::setDeadZone(int n, int *d) {
-  if (*d >= JOYSTICK_CENTER - n && *d <= JOYSTICK_CENTER + n) {
-    *d = 0;
+void Esp32Controller::setDeadZone(int y, int x) {
+  if (y >= JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE &&
+      y <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
+    RadioData.y = 0;
+  } else {
+    RadioData.y = map(y, 0, UINT16_MAX, -255, 255);
+  }
+  if (x >= JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE &&
+      x <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
+    RadioData.x = 0;
+  } else {
+    RadioData.x = map(x, 0, 4095, -255, 255);
   }
 }
 

@@ -33,6 +33,7 @@
 #define JOY_R_X_PIN 35
 
 #define JOYSTICK_CENTER 1900
+#define JOYSTICK_DEAD_ZONE 20
 
 #define OPEN_CONNECT_TO_DB         \
   sqlite3 *db = openConnectToDb(); \
@@ -49,6 +50,7 @@ class Esp32Controller {
   AsyncWebSocket ws;
   bool isAccess;
   bool isNetworkStarted;
+  SemaphoreHandle_t xMutex;
 
  private:
   void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -56,7 +58,7 @@ class Esp32Controller {
                         size_t len);
   void receiveAndSendGpsData();
   void getButtonsDataAndSend();
-  void setDeadZone(int n, int *d);
+  void setDeadZone(int y, int x);
   void savePoint(JsonDocument *doc);
   void deletePoint(int id);
   static sqlite3 *openConnectToDb();
@@ -92,6 +94,7 @@ class Esp32Controller {
 
  public:
   Esp32Controller();
+  void begin();
 };
 
 #endif

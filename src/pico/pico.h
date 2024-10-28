@@ -8,6 +8,7 @@
 #include <TinyGPS++.h>
 #include <data.h>
 #include <nRF24L01.h>
+#include <semphr.h>
 #include <task.h>
 
 #define SEND_TIMER 20
@@ -35,6 +36,7 @@ class PicoBoatController {
   Data receivedData;
   GPSData gpsData;
   SoftwareSerial gpsSerial;
+  SemaphoreHandle_t xMutex;
 
  private:
   void rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm, int motor);
@@ -43,6 +45,9 @@ class PicoBoatController {
   void manualControl();
   void updateGPSData();
   void stopMotors();
+  void receiveData();
+  void initMotors();
+  void actionOnStopReceive();
 
   static void receiveTask(void *param);
   static void sendTask(void *param);
@@ -50,6 +55,7 @@ class PicoBoatController {
 
  public:
   PicoBoatController();
+  void begin();
 };
 
 #endif
