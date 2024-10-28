@@ -124,12 +124,12 @@ bool Esp32Controller::initRadio() {
 #endif
     return false;
   }
-  radio.openWritingPipe(address);
-  radio.openReadingPipe(0, address);
+  radio.openWritingPipe(address[0]);
+  radio.openReadingPipe(0, address[1]);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
   radio.setAutoAck(false);
-  radio.stopListening();
+  radio.startListening();
   return true;
 }
 
@@ -271,7 +271,6 @@ void Esp32Controller::saveWiFiCredentials(String &ssid, String &password) {
 }
 
 void Esp32Controller::receiveAndSendGpsData() {
-  radio.startListening();
   if (radio.available()) {
     radio.read(&gpsData, sizeof(GPSData));
     String json = "{\"action\":\"updatePosition\",\"lat\":" +
@@ -280,13 +279,14 @@ void Esp32Controller::receiveAndSendGpsData() {
                   ",\"course\":" + String(gpsData.course, 2) + "}";
     ws.textAll(json);
   }
-  radio.stopListening();
 }
 
 void Esp32Controller::getButtonsDataAndSend() {
   setDeadZone(analogRead(JOY_L_Y_PIN), analogRead(JOY_R_X_PIN));
   // Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
+  radio.stopListening();
   radio.write(&RadioData, sizeof(Data));
+  radio.startListening();
 }
 
 void Esp32Controller::setDeadZone(int y, int x) {

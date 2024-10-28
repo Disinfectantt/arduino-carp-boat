@@ -1,7 +1,7 @@
 #ifndef DATA_H_
 #define DATA_H_
 
-const byte address[6] = "Node1";
+const byte address[][6] = {"Node1", "Node2"};
 
 #pragma pack(1)
 struct GPSData {

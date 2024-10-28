@@ -21,8 +21,8 @@ void PicoBoatController::begin() {
 #endif
     delay(1000);
   }
-  radio.openReadingPipe(0, address);
-  radio.openWritingPipe(address);
+  radio.openWritingPipe(address[1]);
+  radio.openReadingPipe(0, address[0]);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
   radio.setAutoAck(false);
