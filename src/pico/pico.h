@@ -19,8 +19,8 @@
 #define CE_PIN 20
 #define CSN_PIN 17
 
-#define GPS_TX 3
-#define GPS_RX 2
+#define GPS_TX 13
+#define GPS_RX 12
 
 #define ENA 4  // left engine speed
 #define ENB 5  // right engine speed
@@ -35,7 +35,6 @@ class PicoBoatController {
   TinyGPSPlus gps;
   Data receivedData;
   GPSData gpsData;
-  SoftwareSerial gpsSerial;
   SemaphoreHandle_t xMutex;
 
  private:

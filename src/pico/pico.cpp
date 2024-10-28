@@ -4,7 +4,6 @@ PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      gpsSerial(GPS_TX, GPS_RX),
       xMutex(NULL) {}
 
 void PicoBoatController::begin() {
@@ -12,7 +11,9 @@ void PicoBoatController::begin() {
   Serial.begin(115200);
   while (!Serial);
 #endif
-  gpsSerial.begin(9600);
+  Serial1.setRX(GPS_TX);
+  Serial1.setTX(GPS_RX);
+  Serial1.begin(9600);
 
   while (!radio.begin()) {
 #ifdef DEBUG_MODE
@@ -83,8 +84,8 @@ void PicoBoatController::receiveData() {
 }
 
 void PicoBoatController::updateGPSData() {
-  while (gpsSerial.available() > 0) {
-    if (gps.encode(gpsSerial.read())) {
+  while (Serial1.available() > 0) {
+    if (gps.encode(Serial1.read())) {
       if (gps.location.isValid()) {
         gpsData.latitude = gps.location.lat();
         gpsData.longitude = gps.location.lng();
@@ -92,12 +93,13 @@ void PicoBoatController::updateGPSData() {
           gpsData.course = gps.course.deg();
         }
         // #ifdef DEBUG_MODE
-        //   Serial.printf("lat: %f\nlon: %f\ncourse: %f", gpsData.latitude,
+        //   Serial.printf("lat: %f\nlon: %f\ncourse: %f\n", gpsData.latitude,
         //   gpsData.longitude, gpsData.course);
+        //   Serial.printf("Satellites:%d\n", gps.satellites.value());
         // #endif
       }
     }
-    // Serial.print(char(gpsSerial.read()));
+    // Serial.print(char(Serial1.read()));
   }
 }
 

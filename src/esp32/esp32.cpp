@@ -294,7 +294,7 @@ void Esp32Controller::setDeadZone(int y, int x) {
       y <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
     RadioData.y = 0;
   } else {
-    RadioData.y = map(y, 0, UINT16_MAX, -255, 255);
+    RadioData.y = map(y, 0, 4095, -255, 255);
   }
   if (x >= JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE &&
       x <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
