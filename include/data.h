@@ -3,12 +3,15 @@
 
 const byte address[6] = "Node1";
 
+#pragma pack(1)
 struct GPSData {
   float latitude;
   float longitude;
   float course;
 };
+#pragma pack()
 
+#pragma pack(1)
 struct Data {
   int16_t y;
   int16_t x;
@@ -19,5 +22,6 @@ struct Data {
   float homeLat;
   float homeLon;
 };
+#pragma pack()
 
 #endif
