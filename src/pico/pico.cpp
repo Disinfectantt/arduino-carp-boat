@@ -52,7 +52,7 @@ void PicoBoatController::receiveTask(void *param) {
 void PicoBoatController::sendTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
-    if (xSemaphoreTake(p->xMutex, portMAX_DELAY) == pdTRUE) {
+    if (xSemaphoreTake(p->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
       p->radio.stopListening();
       p->radio.write(&p->gpsData, sizeof(GPSData));
       p->radio.startListening();

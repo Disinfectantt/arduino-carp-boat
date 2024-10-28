@@ -178,6 +178,7 @@
                     if(currentAutoPilotId && currentAutoPilotId === id){
                         sendAutopilotData(0, 0, false);
                         currentAutoPilotId = null;
+                        document.getElementById("autopilotToggle").checked = false;
                     }
                     map.removeLayer(markers[id]);
                     markers[id] = null;
