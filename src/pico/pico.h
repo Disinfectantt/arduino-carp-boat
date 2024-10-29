@@ -11,9 +11,11 @@
 #include <semphr.h>
 #include <task.h>
 
+#define MOTOR_TASK 40
 #define SEND_TIMER 20
 #define RECEIVE_TIMER 10
 #define GPS_TIMER 100
+#define STOP_DELAY 2000
 
 // radio
 #define CE_PIN 20
@@ -36,6 +38,7 @@ class PicoBoatController {
   Data receivedData;
   GPSData gpsData;
   SemaphoreHandle_t xMutex;
+  unsigned long lastRadioDataReceive;
 
  private:
   void rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm, int motor);
@@ -47,10 +50,12 @@ class PicoBoatController {
   void receiveData();
   void initMotors();
   void actionOnStopReceive();
+  void motorControl();
 
   static void receiveTask(void *param);
   static void sendTask(void *param);
   static void gpsTask(void *param);
+  static void motorTask(void *param);
 
  public:
   PicoBoatController();

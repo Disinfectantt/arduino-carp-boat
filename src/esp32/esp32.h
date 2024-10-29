@@ -22,7 +22,8 @@
 #define HOSTNAME "gaypad"
 
 #define TIMER_BUTTONS 10
-#define TIMER_RECEIVE 500
+#define SEND_GPS_TO_FRONTEND 600
+#define TIMER_RECEIVE 100
 #define WIFI_RECONNECT_TIMER 1000
 
 // radio
@@ -56,7 +57,7 @@ class Esp32Controller {
   void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         AwsEventType type, void *arg, uint8_t *data,
                         size_t len);
-  void receiveAndSendGpsData();
+  void receiveGpsData();
   void getButtonsDataAndSend();
   void setDeadZone(int y, int x);
   void savePoint(JsonDocument *doc);
@@ -72,11 +73,13 @@ class Esp32Controller {
   void attemptConnectWifi();
   bool initRadio();
   bool initDb();
+  void sendGpsToFront();
 
   static void buttonsTask(void *param);
   static void receiveTask(void *param);
   static void wifiReconnectTask(void *param);
   static void wifiConnectTask(void *param);
+  static void sendGpsToFrontTask(void *param);
 
   static void sendAllPoints(void *client);
   static void processWebsocket(void *param);

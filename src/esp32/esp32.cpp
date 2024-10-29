@@ -37,6 +37,7 @@ void Esp32Controller::begin() {
 
   initWifi();
 
+  xTaskCreate(sendGpsToFrontTask, "front gps", 4056, this, 3, NULL);
   xTaskCreate(receiveTask, "Receive", 2056, this, 4, NULL);
   xTaskCreate(wifiReconnectTask, "WifiReconnect", 2056, this, 5, NULL);
 }
@@ -81,6 +82,14 @@ void Esp32Controller::processWebsocket(void *param) {
   vTaskDelete(NULL);
 }
 
+void Esp32Controller::sendGpsToFrontTask(void *param) {
+  Esp32Controller *c = (Esp32Controller *)param;
+  while (1) {
+    c->sendGpsToFront();
+    vTaskDelay(pdMS_TO_TICKS(SEND_GPS_TO_FRONTEND));
+  }
+}
+
 void Esp32Controller::buttonsTask(void *param) {
   Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
@@ -97,7 +106,7 @@ void Esp32Controller::receiveTask(void *param) {
   Esp32Controller *c = (Esp32Controller *)param;
   while (1) {
     if (xSemaphoreTake(c->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-      c->receiveAndSendGpsData();
+      c->receiveGpsData();
       xSemaphoreGive(c->xMutex);
     }
     // Serial.printf("receive stack: %u\n", uxTaskGetStackHighWaterMark(NULL));
@@ -270,17 +279,9 @@ void Esp32Controller::saveWiFiCredentials(String &ssid, String &password) {
   file.close();
 }
 
-void Esp32Controller::receiveAndSendGpsData() {
+void Esp32Controller::receiveGpsData() {
   if (radio.available()) {
     radio.read(&gpsData, sizeof(GPSData));
-    JsonDocument responseDoc;
-    responseDoc["action"] = "updatePosition";
-    responseDoc["lat"] = String(gpsData.latitude, 6);
-    responseDoc["lon"] = String(gpsData.longitude, 6);
-    responseDoc["course"] = String(gpsData.course, 2);
-    String jsonResponse;
-    serializeJson(responseDoc, jsonResponse);
-    ws.textAll(jsonResponse);
   }
 }
 
@@ -419,4 +420,15 @@ void Esp32Controller::setHome(JsonDocument *doc) {
   RadioData.isHome = true;
   RadioData.homeLat = lat;
   RadioData.homeLon = lon;
+}
+
+void Esp32Controller::sendGpsToFront() {
+  JsonDocument responseDoc;
+  responseDoc["action"] = "updatePosition";
+  responseDoc["lat"] = String(gpsData.latitude, 6);
+  responseDoc["lon"] = String(gpsData.longitude, 6);
+  responseDoc["course"] = String(gpsData.course, 2);
+  String jsonResponse;
+  serializeJson(responseDoc, jsonResponse);
+  ws.textAll(jsonResponse);
 }

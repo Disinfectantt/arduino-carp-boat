@@ -4,7 +4,8 @@ PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
-      xMutex(NULL) {}
+      xMutex(NULL),
+      lastRadioDataReceive(0) {}
 
 void PicoBoatController::begin() {
 #ifdef DEBUG_MODE
@@ -31,6 +32,7 @@ void PicoBoatController::begin() {
   initMotors();
 
   xMutex = xSemaphoreCreateMutex();
+  xTaskCreate(motorTask, "motor", 2048, this, 3, NULL);
   xTaskCreate(receiveTask, "receive", 2048, this, 3, NULL);
   xTaskCreate(sendTask, "send", 2048, this, 2, NULL);
   xTaskCreate(gpsTask, "gps", 2048, this, 3, NULL);
@@ -70,16 +72,30 @@ void PicoBoatController::gpsTask(void *param) {
   }
 }
 
-void PicoBoatController::receiveData() {
-  if (radio.available()) {
-    radio.read(&receivedData, sizeof(Data));
+void PicoBoatController::motorTask(void *param) {
+  PicoBoatController *p = (PicoBoatController *)param;
+  while (1) {
+    p->motorControl();
+    vTaskDelay(pdMS_TO_TICKS(MOTOR_TASK));
+  }
+}
+
+void PicoBoatController::motorControl() {
+  if (lastRadioDataReceive && millis() - lastRadioDataReceive >= STOP_DELAY) {
+    actionOnStopReceive();
+  } else {
     if (receivedData.autopilotEnabled && gps.location.isValid()) {
       navigateToWaypoint(receivedData.autopilotLat, receivedData.autopilotLon);
     } else {
       manualControl();
     }
-  } else {
-    actionOnStopReceive();
+  }
+}
+
+void PicoBoatController::receiveData() {
+  if (radio.available()) {
+    radio.read(&receivedData, sizeof(Data));
+    lastRadioDataReceive = millis();
   }
 }
 
