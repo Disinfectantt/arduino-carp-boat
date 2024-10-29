@@ -5,7 +5,9 @@ PicoBoatController::PicoBoatController()
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
       xMutex(NULL),
-      lastRadioDataReceive(0) {}
+      lastRadioDataReceive(0),
+      prevLpwm(0),
+      prevRpwm(0) {}
 
 void PicoBoatController::begin() {
 #ifdef DEBUG_MODE
@@ -166,12 +168,22 @@ void PicoBoatController::manualControl() {
   setMotors(leftMotor, rightMotor);
 }
 
-void PicoBoatController::setMotors(int leftMotor, int rightMotor) {
+void PicoBoatController::setMotors(int16_t leftMotor, int16_t rightMotor) {
   leftMotor = constrain(leftMotor, -255, 255);
   rightMotor = constrain(rightMotor, -255, 255);
 
-  rotateMotor(IN1, IN2, ENA, leftMotor);
-  rotateMotor(IN3, IN4, ENB, rightMotor);
+  if (prevLpwm == 0 && leftMotor != 0) {
+    rotateMotor(LEFT, leftMotor > 0 ? START_IMPULSE : -START_IMPULSE);
+  }
+
+  if (prevRpwm == 0 && rightMotor != 0) {
+    rotateMotor(RIGHT, rightMotor > 0 ? START_IMPULSE : -START_IMPULSE);
+  }
+
+  rotateMotor(LEFT, leftMotor);
+  rotateMotor(RIGHT, rightMotor);
+  prevLpwm = leftMotor;
+  prevRpwm = rightMotor;
 
   // #ifdef DEBUG_MODE
   //   Serial.print("Left Motor: ");
@@ -181,18 +193,37 @@ void PicoBoatController::setMotors(int leftMotor, int rightMotor) {
   // #endif
 }
 
-void PicoBoatController::rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm,
-                                     int motor) {
-  if (motor > 0) {
-    digitalWrite(in, HIGH);
-    digitalWrite(in2, LOW);
-    analogWrite(pwm, motor);
-  } else if (motor < 0) {
-    digitalWrite(in, LOW);
-    digitalWrite(in2, HIGH);
-    analogWrite(pwm, abs(motor));
-  } else {
-    analogWrite(pwm, 0);
+void PicoBoatController::rotateMotor(MOTOR motor, int16_t speed) {
+  if (motor == LEFT) {
+    if (motor > 0) {
+      digitalWrite(IN1, HIGH);
+      digitalWrite(IN2, LOW);
+      analogWrite(ENA, motor);
+    } else if (motor < 0) {
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, HIGH);
+      analogWrite(ENA, abs(motor));
+    } else {
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, LOW);
+      analogWrite(ENA, 0);
+    }
+  }
+
+  if (motor == RIGHT) {
+    if (motor > 0) {
+      digitalWrite(IN3, LOW);
+      digitalWrite(IN4, HIGH);
+      analogWrite(ENB, motor);
+    } else if (motor < 0) {
+      digitalWrite(IN3, HIGH);
+      digitalWrite(IN4, LOW);
+      analogWrite(ENB, abs(motor));
+    } else {
+      digitalWrite(IN3, LOW);
+      digitalWrite(IN4, LOW);
+      analogWrite(ENB, 0);
+    }
   }
 }
 
@@ -205,6 +236,8 @@ void PicoBoatController::stopMotors() {
   digitalWrite(IN4, LOW);
   analogWrite(ENA, receivedData.x);
   analogWrite(ENB, receivedData.y);
+  prevRpwm = 0;
+  prevLpwm = 0;
 }
 
 void PicoBoatController::initMotors() {

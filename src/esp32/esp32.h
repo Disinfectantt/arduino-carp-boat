@@ -34,7 +34,7 @@
 #define JOY_R_X_PIN 35
 
 #define JOYSTICK_CENTER 1900
-#define JOYSTICK_DEAD_ZONE 20
+#define JOYSTICK_DEAD_ZONE 50
 
 #define OPEN_CONNECT_TO_DB         \
   sqlite3 *db = openConnectToDb(); \

@@ -24,25 +24,30 @@
 #define GPS_TX 13
 #define GPS_RX 12
 
-#define ENA 4  // left engine speed
-#define ENB 5  // right engine speed
-#define IN1 6  // left engine direction
-#define IN2 7  // left engine direction
-#define IN3 8  // right engine direction
-#define IN4 9  // right engine direction
+#define ENA 4   // left engine speed
+#define ENB 5   // right engine speed
+#define IN1 10  // left engine direction
+#define IN2 7   // left engine direction
+#define IN3 8   // right engine direction
+#define IN4 9   // right engine direction
+#define START_IMPULSE 120
 
 class PicoBoatController {
  private:
+  enum MOTOR { RIGHT, LEFT };
+
   RF24 radio;
   TinyGPSPlus gps;
   Data receivedData;
   GPSData gpsData;
   SemaphoreHandle_t xMutex;
   unsigned long lastRadioDataReceive;
+  int16_t prevLpwm;
+  int16_t prevRpwm;
 
  private:
-  void rotateMotor(uint8_t in, uint8_t in2, uint8_t pwm, int motor);
-  void setMotors(int leftMotor, int rightMotor);
+  void rotateMotor(MOTOR motor, int16_t speed);
+  void setMotors(int16_t leftMotor, int16_t rightMotor);
   void navigateToWaypoint(float lat, float lon);
   void manualControl();
   void updateGPSData();
