@@ -273,11 +273,14 @@ void Esp32Controller::saveWiFiCredentials(String &ssid, String &password) {
 void Esp32Controller::receiveAndSendGpsData() {
   if (radio.available()) {
     radio.read(&gpsData, sizeof(GPSData));
-    String json = "{\"action\":\"updatePosition\",\"lat\":" +
-                  String(gpsData.latitude, 6) +
-                  ",\"lon\":" + String(gpsData.longitude, 6) +
-                  ",\"course\":" + String(gpsData.course, 2) + "}";
-    ws.textAll(json);
+    JsonDocument responseDoc;
+    responseDoc["action"] = "updatePosition";
+    responseDoc["lat"] = String(gpsData.latitude, 6);
+    responseDoc["lon"] = String(gpsData.longitude, 6);
+    responseDoc["course"] = String(gpsData.course, 2);
+    String jsonResponse;
+    serializeJson(responseDoc, jsonResponse);
+    ws.textAll(jsonResponse);
   }
 }
 

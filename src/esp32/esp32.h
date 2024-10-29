@@ -22,7 +22,7 @@
 #define HOSTNAME "gaypad"
 
 #define TIMER_BUTTONS 10
-#define TIMER_RECEIVE 20
+#define TIMER_RECEIVE 500
 #define WIFI_RECONNECT_TIMER 1000
 
 // radio
