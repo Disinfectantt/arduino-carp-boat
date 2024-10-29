@@ -195,14 +195,14 @@ void PicoBoatController::setMotors(int16_t leftMotor, int16_t rightMotor) {
 
 void PicoBoatController::rotateMotor(MOTOR motor, int16_t speed) {
   if (motor == LEFT) {
-    if (motor > 0) {
+    if (speed > 0) {
       digitalWrite(IN1, HIGH);
       digitalWrite(IN2, LOW);
-      analogWrite(ENA, motor);
-    } else if (motor < 0) {
+      analogWrite(ENA, speed);
+    } else if (speed < 0) {
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, HIGH);
-      analogWrite(ENA, abs(motor));
+      analogWrite(ENA, abs(speed));
     } else {
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, LOW);
@@ -211,14 +211,14 @@ void PicoBoatController::rotateMotor(MOTOR motor, int16_t speed) {
   }
 
   if (motor == RIGHT) {
-    if (motor > 0) {
+    if (speed > 0) {
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, HIGH);
-      analogWrite(ENB, motor);
-    } else if (motor < 0) {
+      analogWrite(ENB, speed);
+    } else if (speed < 0) {
       digitalWrite(IN3, HIGH);
       digitalWrite(IN4, LOW);
-      analogWrite(ENB, abs(motor));
+      analogWrite(ENB, abs(speed));
     } else {
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, LOW);
