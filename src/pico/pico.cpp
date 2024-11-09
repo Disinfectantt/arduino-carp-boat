@@ -7,7 +7,8 @@ PicoBoatController::PicoBoatController()
       xMutex(NULL),
       lastRadioDataReceive(0),
       prevLpwm(0),
-      prevRpwm(0) {}
+      prevRpwm(0),
+      rudderServo() {}
 
 void PicoBoatController::begin() {
 #ifdef DEBUG_MODE
@@ -102,23 +103,23 @@ void PicoBoatController::receiveData() {
 }
 
 void PicoBoatController::updateGPSData() {
-  while (Serial1.available() > 0) {
-    if (gps.encode(Serial1.read())) {
-      if (gps.location.isValid()) {
-        gpsData.latitude = gps.location.lat();
-        gpsData.longitude = gps.location.lng();
-        if (gps.course.isValid()) {
-          gpsData.course = gps.course.deg();
-        }
-        // #ifdef DEBUG_MODE
-        //   Serial.printf("lat: %f\nlon: %f\ncourse: %f\n", gpsData.latitude,
-        //   gpsData.longitude, gpsData.course);
-        //   Serial.printf("Satellites:%d\n", gps.satellites.value());
-        // #endif
-      }
-    }
-    // Serial.print(char(Serial1.read()));
+  while (Serial1.available()) {
+    // Serial.print((char)Serial1.read());
+    gps.encode(Serial1.read());
   }
+  if (gps.location.isValid()) {
+    gpsData.latitude = gps.location.lat();
+    gpsData.longitude = gps.location.lng();
+    if (gps.course.isValid()) {
+      gpsData.course = gps.course.deg();
+    }
+  }
+  // #ifdef DEBUG_MODE
+  //   Serial.printf("lat: %f\nlon: %f\ncourse: %f\n", gpsData.latitude,
+  //   gpsData.longitude, gpsData.course);
+  //   Serial.printf("Satellites:%d\n", gps.satellites.value());
+  // Serial.printf("Failed checksum: %d\n", gps.failedChecksum());
+  // #endif
 }
 
 void PicoBoatController::navigateToWaypoint(float lat, float lon) {
@@ -172,12 +173,20 @@ void PicoBoatController::setMotors(int16_t leftMotor, int16_t rightMotor) {
   leftMotor = constrain(leftMotor, -255, 255);
   rightMotor = constrain(rightMotor, -255, 255);
 
-  if (prevLpwm == 0 && leftMotor != 0) {
-    rotateMotor(LEFT, leftMotor > 0 ? START_IMPULSE : -START_IMPULSE);
-  }
+  // if (prevLpwm == 0 && leftMotor != 0) {
+  //   rotateMotor(LEFT, leftMotor > 0 ? START_IMPULSE : -START_IMPULSE);
+  // }
 
-  if (prevRpwm == 0 && rightMotor != 0) {
-    rotateMotor(RIGHT, rightMotor > 0 ? START_IMPULSE : -START_IMPULSE);
+  // if (prevRpwm == 0 && rightMotor != 0) {
+  //   rotateMotor(RIGHT, rightMotor > 0 ? START_IMPULSE : -START_IMPULSE);
+  // }
+
+  if (abs(receivedData.y) > THROTTLE_THRESHOLD &&
+      (leftMotor * rightMotor > 0)) {
+    int rudderAngle = map(receivedData.x, -255, 255, 45, 135);
+    rudderServo.write(rudderAngle);
+  } else {
+    rudderServo.write(90);
   }
 
   rotateMotor(LEFT, leftMotor);
@@ -238,6 +247,7 @@ void PicoBoatController::stopMotors() {
   analogWrite(ENB, receivedData.y);
   prevRpwm = 0;
   prevLpwm = 0;
+  rudderServo.write(90);
 }
 
 void PicoBoatController::initMotors() {
@@ -247,6 +257,7 @@ void PicoBoatController::initMotors() {
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
+  rudderServo.attach(RUDDER_PIN);
   stopMotors();
 }
 

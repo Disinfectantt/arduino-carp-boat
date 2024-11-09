@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <FreeRTOS.h>
 #include <RF24.h>
+#include <Servo.h>
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include <data.h>
@@ -14,7 +15,7 @@
 #define MOTOR_TASK 40
 #define SEND_TIMER 20
 #define RECEIVE_TIMER 10
-#define GPS_TIMER 100
+#define GPS_TIMER 20
 #define STOP_DELAY 2000
 
 // radio
@@ -31,6 +32,9 @@
 #define IN3 8   // right engine direction
 #define IN4 9   // right engine direction
 #define START_IMPULSE 120
+#define THROTTLE_THRESHOLD 200
+
+#define RUDDER_PIN 2
 
 class PicoBoatController {
  private:
@@ -44,6 +48,7 @@ class PicoBoatController {
   unsigned long lastRadioDataReceive;
   int16_t prevLpwm;
   int16_t prevRpwm;
+  Servo rudderServo;
 
  private:
   void rotateMotor(MOTOR motor, int16_t speed);

@@ -177,6 +177,12 @@ void Esp32Controller::initServer() {
       request->send(LittleFS, "/index.html", "text/html");
     }
   });
+  server.on("/manifest.json", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/manifest.json", "application/json");
+  });
+  server.on("/service-worker.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/service-worker.js", "text/javascript");
+  });
   server.on("/wifi_connect", HTTP_POST, [&](AsyncWebServerRequest *request) {
     if (isAccess) {
       String ssid = request->getParam("ssid", true)->value();
