@@ -150,6 +150,7 @@ void PicoBoatController::navigateToWaypoint(float lat, float lon) {
   int leftMotor = throttle + steering;
   int rightMotor = throttle - steering;
 
+  controlRudder(throttle, steering, leftMotor, rightMotor);
   setMotors(leftMotor, rightMotor);
 
   // #ifdef DEBUG_MODE
@@ -166,6 +167,7 @@ void PicoBoatController::manualControl() {
   int leftMotor = throttle + steering;
   int rightMotor = throttle - steering;
 
+  controlRudder(throttle, steering, leftMotor, rightMotor);
   setMotors(leftMotor, rightMotor);
 }
 
@@ -181,14 +183,6 @@ void PicoBoatController::setMotors(int16_t leftMotor, int16_t rightMotor) {
   //   rotateMotor(RIGHT, rightMotor > 0 ? START_IMPULSE : -START_IMPULSE);
   // }
 
-  if (abs(receivedData.y) > THROTTLE_THRESHOLD &&
-      (leftMotor * rightMotor > 0)) {
-    int rudderAngle = map(receivedData.x, -255, 255, 45, 135);
-    rudderServo.write(rudderAngle);
-  } else {
-    rudderServo.write(90);
-  }
-
   rotateMotor(LEFT, leftMotor);
   rotateMotor(RIGHT, rightMotor);
   prevLpwm = leftMotor;
@@ -200,6 +194,16 @@ void PicoBoatController::setMotors(int16_t leftMotor, int16_t rightMotor) {
   //   Serial.print(" Right Motor: ");
   //   Serial.println(rightMotor);
   // #endif
+}
+
+void PicoBoatController::controlRudder(int throttle, int steering,
+                                       int leftMotor, int rightMotor) {
+  if (abs(throttle) > THROTTLE_THRESHOLD && (leftMotor * rightMotor > 0)) {
+    int rudderAngle = map(steering, -255, 255, 45, 135);
+    rudderServo.write(rudderAngle);
+  } else {
+    rudderServo.write(90);
+  }
 }
 
 void PicoBoatController::rotateMotor(MOTOR motor, int16_t speed) {

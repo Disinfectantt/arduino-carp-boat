@@ -34,7 +34,7 @@
 #define START_IMPULSE 120
 #define THROTTLE_THRESHOLD 200
 
-#define RUDDER_PIN 2
+#define RUDDER_PIN 22
 
 class PicoBoatController {
  private:
@@ -61,6 +61,7 @@ class PicoBoatController {
   void initMotors();
   void actionOnStopReceive();
   void motorControl();
+  void controlRudder(int throttle, int steering, int leftMotor, int rightMotor);
 
   static void receiveTask(void *param);
   static void sendTask(void *param);
