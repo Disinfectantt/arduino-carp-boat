@@ -429,12 +429,18 @@ void Esp32Controller::setHome(JsonDocument *doc) {
 }
 
 void Esp32Controller::sendGpsToFront() {
-  JsonDocument responseDoc;
-  responseDoc["action"] = "updatePosition";
-  responseDoc["lat"] = String(gpsData.latitude, 6);
-  responseDoc["lon"] = String(gpsData.longitude, 6);
-  responseDoc["course"] = String(gpsData.course, 2);
-  String jsonResponse;
-  serializeJson(responseDoc, jsonResponse);
-  ws.textAll(jsonResponse);
+  static GPSData previousGpsData = {0.0f, 0.0f, 0.0f};
+  
+  if (gpsData != previousGpsData) {
+    JsonDocument responseDoc;
+    responseDoc["action"] = "updatePosition";
+    responseDoc["lat"] = String(gpsData.latitude, 6);
+    responseDoc["lon"] = String(gpsData.longitude, 6);
+    responseDoc["course"] = String(gpsData.course, 2);
+    String jsonResponse;
+    serializeJson(responseDoc, jsonResponse);
+    ws.textAll(jsonResponse);
+    
+    previousGpsData = gpsData;
+  }
 }

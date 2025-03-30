@@ -8,6 +8,16 @@ struct GPSData {
   float latitude;
   float longitude;
   float course;
+
+   bool operator==(const GPSData& other) const {
+    return (latitude == other.latitude) && 
+           (longitude == other.longitude) && 
+           (course == other.course);
+  }
+  
+  bool operator!=(const GPSData& other) const {
+    return !(*this == other);
+  }
 };
 #pragma pack()
 
