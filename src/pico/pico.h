@@ -11,12 +11,14 @@
 #include <nRF24L01.h>
 #include <semphr.h>
 #include <task.h>
+#include <QMC5883LCompass.h>
 
 #define MOTOR_TASK 40
 #define SEND_TIMER 20
 #define RECEIVE_TIMER 10
 #define GPS_TIMER 20
 #define STOP_DELAY 2000
+#define COMPASS_TIMER 50
 
 // radio
 #define CE_PIN 20
@@ -36,6 +38,9 @@
 
 #define RUDDER_PIN 22
 
+#define I2C_SDA 4
+#define I2C_SCL 5
+
 class PicoBoatController {
  private:
   enum MOTOR { RIGHT, LEFT };
@@ -44,6 +49,7 @@ class PicoBoatController {
   TinyGPSPlus gps;
   Data receivedData;
   GPSData gpsData;
+  QMC5883LCompass compass;
   SemaphoreHandle_t xMutex;
   unsigned long lastRadioDataReceive;
   int16_t prevLpwm;
@@ -54,6 +60,7 @@ class PicoBoatController {
   void rotateMotor(MOTOR motor, int16_t speed);
   void setMotors(int16_t leftMotor, int16_t rightMotor);
   void navigateToWaypoint(float lat, float lon);
+  void updateCompassData();
   void manualControl();
   void updateGPSData();
   void stopMotors();
@@ -67,6 +74,7 @@ class PicoBoatController {
   static void sendTask(void *param);
   static void gpsTask(void *param);
   static void motorTask(void *param);
+  static void compassTask(void *param);
 
  public:
   PicoBoatController();

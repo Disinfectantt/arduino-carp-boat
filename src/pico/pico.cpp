@@ -4,6 +4,7 @@ PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0.0f},
+      compass(),
       xMutex(NULL),
       lastRadioDataReceive(0),
       prevLpwm(0),
@@ -18,6 +19,12 @@ void PicoBoatController::begin() {
   Serial1.setRX(GPS_TX);
   Serial1.setTX(GPS_RX);
   Serial1.begin(9600);
+
+  Wire.setSDA(I2C_SDA);
+  Wire.setSCL(I2C_SCL);
+  Wire.begin();
+
+  compass.init();
 
   while (!radio.begin()) {
 #ifdef DEBUG_MODE
@@ -39,6 +46,7 @@ void PicoBoatController::begin() {
   xTaskCreate(receiveTask, "receive", 2048, this, 3, NULL);
   xTaskCreate(sendTask, "send", 2048, this, 2, NULL);
   xTaskCreate(gpsTask, "gps", 2048, this, 3, NULL);
+  xTaskCreate(compassTask, "compass", 2048, this, 3, NULL);
 }
 
 void PicoBoatController::receiveTask(void *param) {
@@ -83,6 +91,32 @@ void PicoBoatController::motorTask(void *param) {
   }
 }
 
+void PicoBoatController::compassTask(void *param) {
+  PicoBoatController *p = (PicoBoatController *)param;
+  while (1) {
+    p->updateCompassData();
+    vTaskDelay(pdMS_TO_TICKS(COMPASS_TIMER));
+  }
+}
+
+void PicoBoatController::updateCompassData() {
+  compass.read();
+  
+  int x = compass.getX();
+  int y = compass.getY();
+
+  float heading = atan2(y, x) * 180.0 / PI;
+  if (heading < 0) heading += 360;
+  if (heading >= 360) heading -= 360;
+  
+  gpsData.course = heading;
+  
+  // #ifdef DEBUG_MODE
+  //   Serial.print("Compass Heading: ");
+  //   Serial.println(gpsData.course);
+  // #endif
+}
+
 void PicoBoatController::motorControl() {
   if (lastRadioDataReceive && millis() - lastRadioDataReceive >= STOP_DELAY) {
     actionOnStopReceive();
@@ -110,9 +144,6 @@ void PicoBoatController::updateGPSData() {
   if (gps.location.isValid()) {
     gpsData.latitude = gps.location.lat();
     gpsData.longitude = gps.location.lng();
-    if (gps.course.isValid()) {
-      gpsData.course = gps.course.deg();
-    }
   }
   // #ifdef DEBUG_MODE
   //   Serial.printf("lat: %f\nlon: %f\ncourse: %f\n", gpsData.latitude,
