@@ -3,7 +3,7 @@
 PicoBoatController::PicoBoatController()
     : radio(CE_PIN, CSN_PIN),
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
-      gpsData{0.0f, 0.0f, 0.0f},
+      gpsData{0.0f, 0.0f, 0},
       compass(),
       xMutex(NULL),
       lastRadioDataReceive(0),
@@ -101,11 +101,8 @@ void PicoBoatController::compassTask(void *param) {
 
 void PicoBoatController::updateCompassData() {
   compass.read();
-  
-  int x = compass.getX();
-  int y = compass.getY();
 
-  float heading = atan2(y, x) * 180.0 / PI;
+  int heading = compass.getAzimuth();
   if (heading < 0) heading += 360;
   if (heading >= 360) heading -= 360;
   

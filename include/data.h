@@ -7,7 +7,7 @@ const byte address[][6] = {"Node1", "Node2"};
 struct GPSData {
   float latitude;
   float longitude;
-  float course;
+  int course;
 
    bool operator==(const GPSData& other) const {
     return (latitude == other.latitude) && 

@@ -5,7 +5,7 @@ Esp32Controller::Esp32Controller()
       server(80),
       ws("/ws"),
       RadioData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
-      gpsData{0.0f, 0.0f, 0.0f},
+      gpsData{0.0f, 0.0f, 0},
       isAccess(false),
       isNetworkStarted(false),
       xMutex(NULL) {}
@@ -429,14 +429,14 @@ void Esp32Controller::setHome(JsonDocument *doc) {
 }
 
 void Esp32Controller::sendGpsToFront() {
-  static GPSData previousGpsData = {0.0f, 0.0f, 0.0f};
+  static GPSData previousGpsData = {0.0f, 0.0f, 0};
   
   if (gpsData != previousGpsData) {
     JsonDocument responseDoc;
     responseDoc["action"] = "updatePosition";
     responseDoc["lat"] = String(gpsData.latitude, 6);
     responseDoc["lon"] = String(gpsData.longitude, 6);
-    responseDoc["course"] = String(gpsData.course, 2);
+    responseDoc["course"] = String(gpsData.course);
     String jsonResponse;
     serializeJson(responseDoc, jsonResponse);
     ws.textAll(jsonResponse);
