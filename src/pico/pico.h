@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <FreeRTOS.h>
+#include <QMC5883LCompass.h>
 #include <RF24.h>
 #include <Servo.h>
 #include <SoftwareSerial.h>
@@ -11,7 +12,8 @@
 #include <nRF24L01.h>
 #include <semphr.h>
 #include <task.h>
-#include <QMC5883LCompass.h>
+
+#include "motor.h"
 
 #define MOTOR_TASK 40
 #define SEND_TIMER 20
@@ -27,24 +29,16 @@
 #define GPS_TX 13
 #define GPS_RX 12
 
-#define ENA 4   // left engine speed
-#define ENB 5   // right engine speed
-#define IN1 10  // left engine direction
-#define IN2 7   // left engine direction
-#define IN3 8   // right engine direction
-#define IN4 9   // right engine direction
-#define START_IMPULSE 120
 #define THROTTLE_THRESHOLD 200
 
 #define RUDDER_PIN 22
 
+// gps
 #define I2C_SDA 4
 #define I2C_SCL 5
 
 class PicoBoatController {
  private:
-  enum MOTOR { RIGHT, LEFT };
-
   RF24 radio;
   TinyGPSPlus gps;
   Data receivedData;
@@ -52,12 +46,10 @@ class PicoBoatController {
   QMC5883LCompass compass;
   SemaphoreHandle_t xMutex;
   unsigned long lastRadioDataReceive;
-  int16_t prevLpwm;
-  int16_t prevRpwm;
   Servo rudderServo;
+  MotorController motorController;
 
  private:
-  void rotateMotor(MOTOR motor, int16_t speed);
   void setMotors(int16_t leftMotor, int16_t rightMotor);
   void navigateToWaypoint(float lat, float lon);
   void updateCompassData();
@@ -65,7 +57,7 @@ class PicoBoatController {
   void updateGPSData();
   void stopMotors();
   void receiveData();
-  void initMotors();
+  void initControls();
   void actionOnStopReceive();
   void motorControl();
   void controlRudder(int throttle, int steering, int leftMotor, int rightMotor);

@@ -7,9 +7,8 @@ PicoBoatController::PicoBoatController()
       compass(),
       xMutex(NULL),
       lastRadioDataReceive(0),
-      prevLpwm(0),
-      prevRpwm(0),
-      rudderServo() {}
+      rudderServo(),
+      motorController() {}
 
 void PicoBoatController::begin() {
 #ifdef DEBUG_MODE
@@ -39,7 +38,7 @@ void PicoBoatController::begin() {
   radio.setAutoAck(false);
   radio.startListening();
 
-  initMotors();
+  initControls();
 
   xMutex = xSemaphoreCreateMutex();
   xTaskCreate(motorTask, "motor", 2048, this, 3, NULL);
@@ -105,9 +104,9 @@ void PicoBoatController::updateCompassData() {
   int heading = compass.getAzimuth();
   if (heading < 0) heading += 360;
   if (heading >= 360) heading -= 360;
-  
+
   gpsData.course = heading;
-  
+
   // #ifdef DEBUG_MODE
   //   Serial.print("Compass Heading: ");
   //   Serial.println(gpsData.course);
@@ -175,8 +174,8 @@ void PicoBoatController::navigateToWaypoint(float lat, float lon) {
     return;
   }
 
-  int leftMotor = throttle + steering;
-  int rightMotor = throttle - steering;
+  int leftMotor = constrain(throttle + steering, -255, 255);
+  int rightMotor = constrain(throttle - steering, -255, 255);
 
   controlRudder(throttle, steering, leftMotor, rightMotor);
   setMotors(leftMotor, rightMotor);
@@ -192,29 +191,16 @@ void PicoBoatController::navigateToWaypoint(float lat, float lon) {
 void PicoBoatController::manualControl() {
   int throttle = receivedData.y;
   int steering = receivedData.x;
-  int leftMotor = throttle + steering;
-  int rightMotor = throttle - steering;
+  int leftMotor = constrain(throttle + steering, -255, 255);
+  int rightMotor = constrain(throttle - steering, -255, 255);
 
   controlRudder(throttle, steering, leftMotor, rightMotor);
   setMotors(leftMotor, rightMotor);
 }
 
 void PicoBoatController::setMotors(int16_t leftMotor, int16_t rightMotor) {
-  leftMotor = constrain(leftMotor, -255, 255);
-  rightMotor = constrain(rightMotor, -255, 255);
-
-  // if (prevLpwm == 0 && leftMotor != 0) {
-  //   rotateMotor(LEFT, leftMotor > 0 ? START_IMPULSE : -START_IMPULSE);
-  // }
-
-  // if (prevRpwm == 0 && rightMotor != 0) {
-  //   rotateMotor(RIGHT, rightMotor > 0 ? START_IMPULSE : -START_IMPULSE);
-  // }
-
-  rotateMotor(LEFT, leftMotor);
-  rotateMotor(RIGHT, rightMotor);
-  prevLpwm = leftMotor;
-  prevRpwm = rightMotor;
+  motorController.rotateMotorLeft(leftMotor);
+  motorController.rotateMotorRight(rightMotor);
 
   // #ifdef DEBUG_MODE
   //   Serial.print("Left Motor: ");
@@ -234,61 +220,17 @@ void PicoBoatController::controlRudder(int throttle, int steering,
   }
 }
 
-void PicoBoatController::rotateMotor(MOTOR motor, int16_t speed) {
-  if (motor == LEFT) {
-    if (speed > 0) {
-      digitalWrite(IN1, HIGH);
-      digitalWrite(IN2, LOW);
-      analogWrite(ENA, speed);
-    } else if (speed < 0) {
-      digitalWrite(IN1, LOW);
-      digitalWrite(IN2, HIGH);
-      analogWrite(ENA, abs(speed));
-    } else {
-      digitalWrite(IN1, LOW);
-      digitalWrite(IN2, LOW);
-      analogWrite(ENA, 0);
-    }
-  }
-
-  if (motor == RIGHT) {
-    if (speed > 0) {
-      digitalWrite(IN3, LOW);
-      digitalWrite(IN4, HIGH);
-      analogWrite(ENB, speed);
-    } else if (speed < 0) {
-      digitalWrite(IN3, HIGH);
-      digitalWrite(IN4, LOW);
-      analogWrite(ENB, abs(speed));
-    } else {
-      digitalWrite(IN3, LOW);
-      digitalWrite(IN4, LOW);
-      analogWrite(ENB, 0);
-    }
-  }
-}
-
 void PicoBoatController::stopMotors() {
   receivedData.x = 0;
   receivedData.y = 0;
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
-  analogWrite(ENA, receivedData.x);
-  analogWrite(ENB, receivedData.y);
-  prevRpwm = 0;
-  prevLpwm = 0;
+
+  motorController.stopMotors();
+
   rudderServo.write(90);
 }
 
-void PicoBoatController::initMotors() {
-  pinMode(ENA, OUTPUT);
-  pinMode(ENB, OUTPUT);
-  pinMode(IN1, OUTPUT);
-  pinMode(IN2, OUTPUT);
-  pinMode(IN3, OUTPUT);
-  pinMode(IN4, OUTPUT);
+void PicoBoatController::initControls() {
+  motorController.initMotors();
   rudderServo.attach(RUDDER_PIN);
   stopMotors();
 }
