@@ -5,7 +5,8 @@ PicoBoatController::PicoBoatController()
       receivedData{0, 0, 0.0f, 0.0f, false, false, 0.0f, 0.0f},
       gpsData{0.0f, 0.0f, 0},
       compass(),
-      xMutex(NULL),
+      gyro(GYRO_ADDRESS),
+      radioMutex(NULL),
       lastRadioDataReceive(0),
       rudderServo(),
       motorController() {}
@@ -23,7 +24,9 @@ void PicoBoatController::begin() {
   Wire.setSCL(I2C_SCL);
   Wire.begin();
 
-  compass.init();
+  initControls();
+  initCompass();
+  initGyro();
 
   while (!radio.begin()) {
 #ifdef DEBUG_MODE
@@ -38,9 +41,7 @@ void PicoBoatController::begin() {
   radio.setAutoAck(false);
   radio.startListening();
 
-  initControls();
-
-  xMutex = xSemaphoreCreateMutex();
+  radioMutex = xSemaphoreCreateMutex();
   xTaskCreate(motorTask, "motor", 2048, this, 3, NULL);
   xTaskCreate(receiveTask, "receive", 2048, this, 3, NULL);
   xTaskCreate(sendTask, "send", 2048, this, 2, NULL);
@@ -51,9 +52,9 @@ void PicoBoatController::begin() {
 void PicoBoatController::receiveTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
-    if (xSemaphoreTake(p->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    if (xSemaphoreTake(p->radioMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
       p->receiveData();
-      xSemaphoreGive(p->xMutex);
+      xSemaphoreGive(p->radioMutex);
     } else {
       p->actionOnStopReceive();
     }
@@ -64,11 +65,11 @@ void PicoBoatController::receiveTask(void *param) {
 void PicoBoatController::sendTask(void *param) {
   PicoBoatController *p = (PicoBoatController *)param;
   while (1) {
-    if (xSemaphoreTake(p->xMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+    if (xSemaphoreTake(p->radioMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
       p->radio.stopListening();
       p->radio.write(&p->gpsData, sizeof(GPSData));
       p->radio.startListening();
-      xSemaphoreGive(p->xMutex);
+      xSemaphoreGive(p->radioMutex);
     }
     vTaskDelay(pdMS_TO_TICKS(SEND_TIMER));
   }
@@ -100,8 +101,29 @@ void PicoBoatController::compassTask(void *param) {
 
 void PicoBoatController::updateCompassData() {
   compass.read();
+  gyro.read();
 
-  int heading = compass.getAzimuth();
+  float magX = compass.getX();
+  float magY = compass.getY();
+  float magZ = compass.getZ();
+
+  float roll = gyro.getRoll() * PI / 180.0;
+  float pitch = gyro.getPitch() * PI / 180.0;
+
+  float cosRoll = cos(roll);
+  float sinRoll = sin(roll);
+  float cosPitch = cos(pitch);
+  float sinPitch = sin(pitch);
+
+  float magX_compensated = magX * cosPitch + magZ * sinPitch;
+  float magY_compensated =
+      magX * sinRoll * sinPitch + magY * cosRoll - magZ * sinRoll * cosPitch;
+
+  float heading_rad = atan2(magY_compensated, magX_compensated);
+
+  int heading = (int)(heading_rad * 180.0 / PI);
+  heading += MAGNETIC_DECLINATION;
+
   if (heading < 0) heading += 360;
   if (heading >= 360) heading -= 360;
 
@@ -233,6 +255,30 @@ void PicoBoatController::initControls() {
   motorController.initMotors();
   rudderServo.attach(RUDDER_PIN);
   stopMotors();
+}
+
+void PicoBoatController::initGyro() {
+  gyro.axe = 0;
+  gyro.aye = 0;
+  gyro.aze = 0;
+  gyro.gxe = 0;
+  gyro.gye = 0;
+  gyro.gze = 0;
+  gyro.setAccelSensitivity(2);
+  gyro.setGyroSensitivity(1);
+  if (!gyro.begin()) {
+#ifdef DEBUG_MODE
+    Serial.println("Gyro now started");
+#endif
+  }
+}
+
+void PicoBoatController::initCompass() {
+  compass.setCalibrationOffsets(0, 0, 0);
+  compass.setCalibrationScales(0, 0, 0);
+  compass.setMagneticDeclination(MAGNETIC_DECLINATION_DEG,
+                                 MAGNETIC_DECLINATION_MIN);
+  compass.init();
 }
 
 void PicoBoatController::actionOnStopReceive() {

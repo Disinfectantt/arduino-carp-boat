@@ -13,6 +13,7 @@
 #include <semphr.h>
 #include <task.h>
 
+#include "GY521.h"
 #include "motor.h"
 
 #define MOTOR_TASK 40
@@ -33,9 +34,17 @@
 
 #define RUDDER_PIN 22
 
-// gps
+// gyro and compass
 #define I2C_SDA 4
 #define I2C_SCL 5
+
+//  address == 0x68 or 0x69
+#define GYRO_ADDRESS 0x68
+
+#define MAGNETIC_DECLINATION_DEG 11
+#define MAGNETIC_DECLINATION_MIN 56
+#define MAGNETIC_DECLINATION \
+  MAGNETIC_DECLINATION_DEG + MAGNETIC_DECLINATION_MIN / 60;
 
 class PicoBoatController {
  private:
@@ -44,7 +53,8 @@ class PicoBoatController {
   Data receivedData;
   GPSData gpsData;
   QMC5883LCompass compass;
-  SemaphoreHandle_t xMutex;
+  GY521 gyro;
+  SemaphoreHandle_t radioMutex;
   unsigned long lastRadioDataReceive;
   Servo rudderServo;
   MotorController motorController;
@@ -58,6 +68,8 @@ class PicoBoatController {
   void stopMotors();
   void receiveData();
   void initControls();
+  void initGyro();
+  void initCompass();
   void actionOnStopReceive();
   void motorControl();
   void controlRudder(int throttle, int steering, int leftMotor, int rightMotor);
