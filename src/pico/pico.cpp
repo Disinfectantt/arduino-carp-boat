@@ -67,8 +67,10 @@ void PicoBoatController::sendTask(void *param) {
   while (1) {
     if (xSemaphoreTake(p->radioMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
       p->radio.stopListening();
+      vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
       p->radio.write(&p->gpsData, sizeof(GPSData));
       p->radio.startListening();
+      vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
       xSemaphoreGive(p->radioMutex);
     }
     vTaskDelay(pdMS_TO_TICKS(SEND_TIMER));
@@ -100,38 +102,50 @@ void PicoBoatController::compassTask(void *param) {
 }
 
 void PicoBoatController::updateCompassData() {
-  compass.read();
   gyro.read();
+  compass.read();
+
+  float gx = gyro.getGyroX();
+  float gy = gyro.getGyroY();
+  float gz = gyro.getGyroZ();
+
+  // Чтение акселерометра
+  float accel_roll = atan2(gyro.getAccelY(), gyro.getAccelZ()) * TO_DEGREES;
+  float accel_pitch =
+      atan2(-gyro.getAccelX(), sqrt(gyro.getAccelY() * gyro.getAccelY() +
+                                    gyro.getAccelZ() * gyro.getAccelZ())) *
+      TO_DEGREES;
+
+  // Фильтрация
+  float roll = GYRO_ALPHA * (roll + gx * 0.01) + (1 - GYRO_ALPHA) * accel_roll;
+  float pitch =
+      GYRO_ALPHA * (pitch + gy * 0.01) + (1 - GYRO_ALPHA) * accel_pitch;
 
   float magX = compass.getX();
   float magY = compass.getY();
-  float magZ = compass.getZ();
 
-  float roll = gyro.getRoll() * PI / 180.0;
-  float pitch = gyro.getPitch() * PI / 180.0;
+  // Компенсация наклона (Tilt Compensation)
+  float cos_roll = cos(roll * TO_DEGREES);
+  float sin_roll = sin(roll * TO_DEGREES);
+  float cos_pitch = cos(pitch * TO_DEGREES);
+  float sin_pitch = sin(pitch * TO_DEGREES);
 
-  float cosRoll = cos(roll);
-  float sinRoll = sin(roll);
-  float cosPitch = cos(pitch);
-  float sinPitch = sin(pitch);
+  float magX_comp = magX * cos_pitch + magY * sin_roll * sin_pitch;
+  float magY_comp = magY * cos_roll;
 
-  float magX_compensated = magX * cosPitch + magZ * sinPitch;
-  float magY_compensated =
-      magX * sinRoll * sinPitch + magY * cosRoll - magZ * sinRoll * cosPitch;
-
-  float heading_rad = atan2(magY_compensated, magX_compensated);
-
-  int heading = (int)(heading_rad * 180.0 / PI);
+  // Расчет курса
+  float heading = atan2(magY_comp, magX_comp) * TO_DEGREES;
   heading += MAGNETIC_DECLINATION;
-
   if (heading < 0) heading += 360;
   if (heading >= 360) heading -= 360;
 
-  gpsData.course = heading;
+  gpsData.course = (int)heading;
 
   // #ifdef DEBUG_MODE
-  //   Serial.print("Compass Heading: ");
-  //   Serial.println(gpsData.course);
+  //   Serial.print("Roll: "); Serial.print(roll,1);
+  //   Serial.print("°\tPitch: "); Serial.print(pitch,1);
+  //   Serial.print("°\tHeading: "); Serial.print(heading,1);
+  //   Serial.println("°");
   // #endif
 }
 

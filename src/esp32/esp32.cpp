@@ -295,8 +295,10 @@ void Esp32Controller::getButtonsDataAndSend() {
   setDeadZone(analogRead(JOY_L_Y_PIN), analogRead(JOY_R_X_PIN));
   // Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
   radio.stopListening();
+  vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
   radio.write(&RadioData, sizeof(Data));
   radio.startListening();
+  vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
 }
 
 void Esp32Controller::setDeadZone(int y, int x) {
@@ -430,7 +432,7 @@ void Esp32Controller::setHome(JsonDocument *doc) {
 
 void Esp32Controller::sendGpsToFront() {
   static GPSData previousGpsData = {0.0f, 0.0f, 0};
-  
+
   if (gpsData != previousGpsData) {
     JsonDocument responseDoc;
     responseDoc["action"] = "updatePosition";
@@ -440,7 +442,7 @@ void Esp32Controller::sendGpsToFront() {
     String jsonResponse;
     serializeJson(responseDoc, jsonResponse);
     ws.textAll(jsonResponse);
-    
+
     previousGpsData = gpsData;
   }
 }

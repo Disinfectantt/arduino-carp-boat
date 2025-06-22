@@ -97,29 +97,29 @@ void loop() {
     t += sensor.getTemperature();
   }
 
-  if (counter % 10 == 0) {
+  if (counter % 10 == 0) {  
     Serial.println("\n\tCOPY CODE SNIPPET");
-    Serial.print("sensor.axe = ");
+    Serial.print("gyro.axe = ");
     Serial.print(sensor.axe, 7);
     Serial.print(";\n");
 
-    Serial.print("sensor.aye = ");
+    Serial.print("gyro.aye = ");
     Serial.print(sensor.aye, 7);
     Serial.print(";\n");
 
-    Serial.print("sensor.aze = ");
+    Serial.print("gyro.aze = ");
     Serial.print(sensor.aze, 7);
     Serial.print(";\n");
 
-    Serial.print("sensor.gxe = ");
+    Serial.print("gyro.gxe = ");
     Serial.print(sensor.gxe, 7);
     Serial.print(";\n");
 
-    Serial.print("sensor.gye = ");
+    Serial.print("gyro.gye = ");
     Serial.print(sensor.gye, 7);
     Serial.print(";\n");
 
-    Serial.print("sensor.gze = ");
+    Serial.print("gyro.gze = ");
     Serial.print(sensor.gze, 7);
     Serial.print(";\n");
 

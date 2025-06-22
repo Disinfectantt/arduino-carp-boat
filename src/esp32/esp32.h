@@ -26,6 +26,8 @@
 #define TIMER_RECEIVE 100
 #define WIFI_RECONNECT_TIMER 1000
 
+#define RADIO_SWITCH_DELAY 5
+
 // radio
 #define CE_PIN 16
 #define CSN_PIN 5

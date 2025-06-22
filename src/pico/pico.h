@@ -23,6 +23,8 @@
 #define STOP_DELAY 2000
 #define COMPASS_TIMER 50
 
+#define RADIO_SWITCH_DELAY 5
+
 // radio
 #define CE_PIN 20
 #define CSN_PIN 17
@@ -41,6 +43,8 @@
 //  address == 0x68 or 0x69
 #define GYRO_ADDRESS 0x68
 
+#define TO_DEGREES 180 / PI
+#define GYRO_ALPHA 0.93
 #define MAGNETIC_DECLINATION_DEG 11
 #define MAGNETIC_DECLINATION_MIN 56
 #define MAGNETIC_DECLINATION \
