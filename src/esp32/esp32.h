@@ -26,8 +26,6 @@
 #define TIMER_RECEIVE 100
 #define WIFI_RECONNECT_TIMER 1000
 
-#define RADIO_SWITCH_DELAY 5
-
 // radio
 #define CE_PIN 16
 #define CSN_PIN 5
@@ -61,7 +59,7 @@ class Esp32Controller {
                         size_t len);
   void receiveGpsData();
   void getButtonsDataAndSend();
-  void setDeadZone(int y, int x);
+  float getDeadZoneAxis(float value);
   void savePoint(JsonDocument *doc);
   void deletePoint(int id);
   static sqlite3 *openConnectToDb();
@@ -85,6 +83,9 @@ class Esp32Controller {
 
   static void sendAllPoints(void *client);
   static void processWebsocket(void *param);
+
+  float mapFloat(float value, float fromLow, float fromHigh, float toLow,
+                 float toHigh);
 
   struct webSocketWrapper {
     uint8_t *data;

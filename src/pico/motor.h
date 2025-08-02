@@ -43,15 +43,15 @@ class MotorController {
   void initMotors();
 
  private:
-  void stop(MotorControl& motor);
-  void applySpeed(MotorControl& motor);
-  void reset(MotorControl& motor);
-  void updateMotorState(MotorControl& motor, int16_t speed);
-  void initializeMotor(MotorControl& motor, int absSpeed);
-  void processMotorState(MotorControl& motor, int absSpeed);
-  void processRunning(MotorControl& motor, int absSpeed);
-  void processRampUp(MotorControl& motor, int absSpeed);
-  void processStartPulse(MotorControl& motor, int absSpeed);
+  void stop(MotorControl &motor);
+  void applySpeed(MotorControl &motor);
+  void reset(MotorControl &motor);
+  void updateMotorState(MotorControl &motor, int16_t speed);
+  void initializeMotor(MotorControl &motor, int absSpeed);
+  void processMotorState(MotorControl &motor, int absSpeed);
+  void processRunning(MotorControl &motor, int absSpeed);
+  void processRampUp(MotorControl &motor, int absSpeed);
+  void processStartPulse(MotorControl &motor, int absSpeed);
 };
 
 #endif

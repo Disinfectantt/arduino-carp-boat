@@ -27,19 +27,7 @@ void PicoBoatController::begin() {
   initControls();
   initCompass();
   initGyro();
-
-  while (!radio.begin()) {
-#ifdef DEBUG_MODE
-    Serial.println("Radio doesn t work");
-#endif
-    delay(1000);
-  }
-  radio.openWritingPipe(address[1]);
-  radio.openReadingPipe(0, address[0]);
-  radio.setPALevel(RF24_PA_MAX);
-  radio.setDataRate(RF24_250KBPS);
-  radio.setAutoAck(false);
-  radio.startListening();
+  initRadio();
 
   radioMutex = xSemaphoreCreateMutex();
   xTaskCreate(motorTask, "motor", 2048, this, 3, NULL);
@@ -47,6 +35,27 @@ void PicoBoatController::begin() {
   xTaskCreate(sendTask, "send", 2048, this, 2, NULL);
   xTaskCreate(gpsTask, "gps", 2048, this, 3, NULL);
   xTaskCreate(compassTask, "compass", 2048, this, 3, NULL);
+}
+
+void PicoBoatController::initRadio() {
+  while (!radio.begin()) {
+#ifdef DEBUG_MODE
+    Serial.println("Radio doesn t work");
+#endif
+    delay(1000);
+  }
+
+  radio.openWritingPipe(address[1]);
+  radio.openReadingPipe(0, address[0]);
+  radio.setPALevel(RF24_PA_MAX);
+  radio.setDataRate(RF24_250KBPS);
+  radio.setChannel(76);
+  radio.setRetries(15, 15);
+  radio.setCRCLength(RF24_CRC_16);
+  radio.setAutoAck(true);
+  radio.enableDynamicPayloads();
+  radio.setAddressWidth(5);
+  radio.startListening();
 }
 
 void PicoBoatController::receiveTask(void *param) {
@@ -67,10 +76,8 @@ void PicoBoatController::sendTask(void *param) {
   while (1) {
     if (xSemaphoreTake(p->radioMutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
       p->radio.stopListening();
-      vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
       p->radio.write(&p->gpsData, sizeof(GPSData));
       p->radio.startListening();
-      vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
       xSemaphoreGive(p->radioMutex);
     }
     vTaskDelay(pdMS_TO_TICKS(SEND_TIMER));
@@ -162,8 +169,19 @@ void PicoBoatController::motorControl() {
 }
 
 void PicoBoatController::receiveData() {
-  if (radio.available()) {
-    radio.read(&receivedData, sizeof(Data));
+  uint8_t count = 0;
+  Data buffer[5];
+
+  while (radio.available() && count < 5) {
+    radio.read(&buffer[count++], sizeof(Data));
+  }
+
+  if (count > 0) {
+    std::sort(buffer, buffer + count, [](const Data &a, const Data &b) {
+      return (std::abs(a.x) + std::abs(a.y)) < (std::abs(b.x) + std::abs(b.y));
+    });
+
+    receivedData = buffer[count / 2];
     lastRadioDataReceive = millis();
   }
 }

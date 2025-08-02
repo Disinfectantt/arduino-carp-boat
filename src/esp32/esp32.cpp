@@ -133,11 +133,18 @@ bool Esp32Controller::initRadio() {
 #endif
     return false;
   }
-  radio.openWritingPipe(address[0]);
-  radio.openReadingPipe(0, address[1]);
   radio.setPALevel(RF24_PA_MAX);
   radio.setDataRate(RF24_250KBPS);
-  radio.setAutoAck(false);
+  radio.setChannel(76);
+  radio.setRetries(15, 15);
+  radio.setCRCLength(RF24_CRC_16);
+  radio.setAutoAck(true);
+  radio.enableDynamicPayloads();
+  radio.setAutoAck(true);
+  radio.setAddressWidth(5);
+
+  radio.openWritingPipe(address[0]);
+  radio.openReadingPipe(0, address[1]);
   radio.startListening();
   return true;
 }
@@ -292,27 +299,33 @@ void Esp32Controller::receiveGpsData() {
 }
 
 void Esp32Controller::getButtonsDataAndSend() {
-  setDeadZone(analogRead(JOY_L_Y_PIN), analogRead(JOY_R_X_PIN));
+  static float xFiltered = 0.0f;
+  static float yFiltered = 0.0f;
+  static const float alpha = 0.3f;  // Коэффициент сглаживания (0.1-0.5)
+
+  int rawX = analogRead(JOY_R_X_PIN);
+  int rawY = analogRead(JOY_L_Y_PIN);
+
+  // EMA-фильтрация
+  xFiltered = alpha * rawX + (1 - alpha) * xFiltered;
+  yFiltered = alpha * rawY + (1 - alpha) * yFiltered;
+
+  RadioData.y = (int)getDeadZoneAxis(yFiltered);
+  RadioData.x = (int)getDeadZoneAxis(xFiltered);
+
   // Serial.printf("X: %d\n Y:%d\n", RadioData.x, RadioData.y);
+
   radio.stopListening();
-  vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
   radio.write(&RadioData, sizeof(Data));
   radio.startListening();
-  vTaskDelay(pdMS_TO_TICKS(RADIO_SWITCH_DELAY));
 }
 
-void Esp32Controller::setDeadZone(int y, int x) {
-  if (y >= JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE &&
-      y <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
-    RadioData.y = 0;
+float Esp32Controller::getDeadZoneAxis(float value) {
+  if (value >= JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE &&
+      value <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
+    return 0;
   } else {
-    RadioData.y = map(y, 0, 4095, -255, 255);
-  }
-  if (x >= JOYSTICK_CENTER - JOYSTICK_DEAD_ZONE &&
-      x <= JOYSTICK_CENTER + JOYSTICK_DEAD_ZONE) {
-    RadioData.x = 0;
-  } else {
-    RadioData.x = map(x, 0, 4095, -255, 255);
+    return constrain(mapFloat(value, 0, 4095, -255, 255), -255, 255);
   }
 }
 
@@ -445,4 +458,9 @@ void Esp32Controller::sendGpsToFront() {
 
     previousGpsData = gpsData;
   }
+}
+
+float Esp32Controller::mapFloat(float value, float fromLow, float fromHigh,
+                                float toLow, float toHigh) {
+  return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
 }

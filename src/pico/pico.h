@@ -13,6 +13,8 @@
 #include <semphr.h>
 #include <task.h>
 
+#include <algorithm>
+
 #include "GY521.h"
 #include "motor.h"
 
@@ -22,8 +24,6 @@
 #define GPS_TIMER 20
 #define STOP_DELAY 2000
 #define COMPASS_TIMER 50
-
-#define RADIO_SWITCH_DELAY 5
 
 // radio
 #define CE_PIN 20
@@ -59,7 +59,7 @@ class PicoBoatController {
   QMC5883LCompass compass;
   GY521 gyro;
   SemaphoreHandle_t radioMutex;
-  unsigned long lastRadioDataReceive;
+  unsigned long volatile lastRadioDataReceive;
   Servo rudderServo;
   MotorController motorController;
 
@@ -77,6 +77,7 @@ class PicoBoatController {
   void actionOnStopReceive();
   void motorControl();
   void controlRudder(int throttle, int steering, int leftMotor, int rightMotor);
+  void initRadio();
 
   static void receiveTask(void *param);
   static void sendTask(void *param);

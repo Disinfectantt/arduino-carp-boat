@@ -4,7 +4,7 @@ MotorController::MotorController()
     : leftMotor{0, 0, true, MotorState::IDLE, 0, D0, D1},
       rightMotor{0, 0, true, MotorState::IDLE, 0, D2, D3} {}
 
-void MotorController::updateMotorState(MotorControl& motor, int16_t speed) {
+void MotorController::updateMotorState(MotorControl &motor, int16_t speed) {
   motor.targetSpeed = speed;
   motor.forward = (speed >= 0);
   int absSpeed = abs(speed);
@@ -27,7 +27,7 @@ void MotorController::updateMotorState(MotorControl& motor, int16_t speed) {
   }
 }
 
-void MotorController::initializeMotor(MotorControl& motor, int absSpeed) {
+void MotorController::initializeMotor(MotorControl &motor, int absSpeed) {
   unsigned long currentTime = millis();
   if (absSpeed < MotorConfig::MIN_THROTTLE) {
     motor.state = MotorState::START_PULSE;
@@ -42,7 +42,7 @@ void MotorController::initializeMotor(MotorControl& motor, int absSpeed) {
   applySpeed(motor);
 }
 
-void MotorController::processMotorState(MotorControl& motor, int absSpeed) {
+void MotorController::processMotorState(MotorControl &motor, int absSpeed) {
   switch (motor.state) {
     case MotorState::START_PULSE:
       processStartPulse(motor, absSpeed);
@@ -62,7 +62,7 @@ void MotorController::processMotorState(MotorControl& motor, int absSpeed) {
   }
 }
 
-void MotorController::processStartPulse(MotorControl& motor, int absSpeed) {
+void MotorController::processStartPulse(MotorControl &motor, int absSpeed) {
   unsigned long currentTime = millis();
   if (currentTime - motor.stateStartTime >= MotorConfig::START_PULSE_DURATION) {
     motor.state = MotorState::RAMP_UP;
@@ -72,7 +72,7 @@ void MotorController::processStartPulse(MotorControl& motor, int absSpeed) {
   }
 }
 
-void MotorController::processRampUp(MotorControl& motor, int absSpeed) {
+void MotorController::processRampUp(MotorControl &motor, int absSpeed) {
   unsigned long currentTime = millis();
   if (currentTime - motor.stateStartTime >= MotorConfig::RAMP_UP_TIME) {
     motor.state = MotorState::RUNNING;
@@ -87,7 +87,7 @@ void MotorController::processRampUp(MotorControl& motor, int absSpeed) {
   applySpeed(motor);
 }
 
-void MotorController::processRunning(MotorControl& motor, int absSpeed) {
+void MotorController::processRunning(MotorControl &motor, int absSpeed) {
   motor.currentSpeed = static_cast<int>(
       absSpeed * MotorConfig::SMOOTHING_FACTOR +
       motor.currentSpeed * (1.0f - MotorConfig::SMOOTHING_FACTOR));
@@ -107,14 +107,14 @@ void MotorController::stopMotors() {
   stop(rightMotor);
 }
 
-void MotorController::stop(MotorControl& motor) {
+void MotorController::stop(MotorControl &motor) {
   analogWrite(motor.forwardPin, LOW);
   analogWrite(motor.reversePin, LOW);
   motor.state = MotorState::IDLE;
   motor.currentSpeed = 0;
 }
 
-void MotorController::applySpeed(MotorControl& motor) {
+void MotorController::applySpeed(MotorControl &motor) {
   if (motor.forward) {
     analogWrite(motor.forwardPin, motor.currentSpeed);
     analogWrite(motor.reversePin, LOW);
@@ -124,7 +124,7 @@ void MotorController::applySpeed(MotorControl& motor) {
   }
 }
 
-void MotorController::reset(MotorControl& motor) {
+void MotorController::reset(MotorControl &motor) {
   motor.state = MotorState::IDLE;
   motor.currentSpeed = 0;
 }
